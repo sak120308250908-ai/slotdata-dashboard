@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data files (Exclude raw data to keep repository small)
+*.xlsx
+combined_slot_data.csv
+
+# macOS
+.DS_Store
+
+# Streamlit
+.streamlit/
+
+# Virtual environments
+venv/
+env/
+.env/
