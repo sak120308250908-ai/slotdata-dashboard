@@ -26,7 +26,7 @@ components.html(
 
 @st.cache_data
 def load_data():
-    file_path = '/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cleaned_slot_data.csv'
+    file_path = 'cleaned_slot_data.csv'
     df = pd.read_csv(file_path, low_memory=False)
     
     if '機種名（正式名）' in df.columns and '機種名' in df.columns:
