@@ -257,6 +257,54 @@ elif menu == "5. AI・チャット風検索":
     st.header("💬 5. AI・チャット風検索")
     st.write("質問を入力してください。（例：「ハナハナで最も差枚数が出ている台番は？」「からくりサーカスの勝率は？」など）")
     
+    st.markdown("---")
+    st.subheader("✨ 新台強弱判断データ")
+    st.write("対象店舗における「初めて稼働した日」の機種別平均結果を表示します。（データ集計開始時点から存在する機種は除外されます）")
+    
+    if st.button("新台の初日データを抽出する"):
+        with st.spinner("新台のデータを抽出中..."):
+            min_date = df['日付'].min()
+            first_appearance = df.groupby('機種名')['日付'].min().reset_index()
+            new_machines_df = first_appearance[first_appearance['日付'] > min_date]
+            new_machines = new_machines_df['機種名'].tolist()
+            
+            if not new_machines:
+                st.warning("この店舗に新台と判定できるデータがありませんでした。")
+            else:
+                results = []
+                for machine in new_machines:
+                    m_df = df[df['機種名'] == machine].sort_values('日付')
+                    # G数が0より大きいレコード（実際に稼働した日）
+                    active_m_df = m_df[m_df['G数'] > 0]
+                    
+                    if len(active_m_df) > 0:
+                        first_active_date = active_m_df['日付'].iloc[0]
+                        target_df = m_df[m_df['日付'] == first_active_date]
+                        
+                        avg_g = target_df['G数'].mean()
+                        avg_bb = target_df['BB'].mean() if 'BB' in target_df.columns else 0
+                        avg_rb = target_df['RB'].mean() if 'RB' in target_df.columns else 0
+                        avg_art = target_df['ART'].mean() if 'ART' in target_df.columns else 0
+                        avg_diff = target_df['差枚'].mean()
+                        win_rate = (target_df['差枚'] > 0).mean() * 100
+                        
+                        results.append({
+                            '機種名': machine,
+                            '導入/初稼働日': first_active_date.strftime('%Y-%m-%d'),
+                            '台数': len(target_df),
+                            '平均回転数': round(avg_g, 1),
+                            '平均BB': round(avg_bb, 1),
+                            '平均RB': round(avg_rb, 1),
+                            '平均ART': round(avg_art, 1),
+                            '平均差枚数': round(avg_diff, 1),
+                            '勝率': f"{win_rate:.1f}%"
+                        })
+                
+                res_df = pd.DataFrame(results).sort_values('導入/初稼働日', ascending=False)
+                st.success(f"🤖 {len(res_df)}機種の新台データが見つかりました！")
+                st.dataframe(res_df, width="stretch")
+    
+    st.markdown("---")
     query = st.text_input("質問を入力：", placeholder="ハナハナで最も差枚数が出ている台番は？")
     
     if query:
