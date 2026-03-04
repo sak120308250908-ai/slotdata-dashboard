@@ -40,6 +40,16 @@ for f in files:
 
 combined_df = pd.concat(df_list, ignore_index=True)
 
+# 重複排除: 店舗、日付、台番が完全に一致するデータが複数ある場合は、古いものを消して1つにする
+before_dedup = len(combined_df)
+# '日付'列がdatetime型でない場合は変換（念のため）
+combined_df['日付'] = pd.to_datetime(combined_df['日付'])
+combined_df.drop_duplicates(subset=['店舗', '日付', '台番'], keep='last', inplace=True)
+after_dedup = len(combined_df)
+dedup_count = before_dedup - after_dedup
+if dedup_count > 0:
+    print(f"Removed {dedup_count} duplicate rows from overlapping files.")
+
 # Also create cleaned_slot_data.csv to match app expectations
 out_path = '/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cleaned_slot_data.csv'
 combined_df.to_csv(out_path, index=False)
