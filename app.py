@@ -99,7 +99,7 @@ else:
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
-    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. AI・チャット風検索")
+    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索")
 )
 
 # --- ヘッダー ---
@@ -251,14 +251,9 @@ elif menu == "3. 機種別詳細分析":
         fig_hist = px.histogram(m_df, x='差枚', nbins=50)
         st.plotly_chart(fig_hist, use_container_width=True)
 
-# --- 5. AI・チャット風検索 ---
-elif menu == "5. AI・チャット風検索":
-    import re
-    st.header("💬 5. AI・チャット風検索")
-    st.write("質問を入力してください。（例：「ハナハナで最も差枚数が出ている台番は？」「からくりサーカスの勝率は？」など）")
-    
-    st.markdown("---")
-    st.subheader("✨ 新台強弱判断データ")
+# --- 5. 新台の初日・強弱分析 ---
+elif menu == "5. 新台の初日・強弱分析":
+    st.header("✨ 5. 新台強弱判断データ")
     st.write("対象店舗における「初めて稼働した日」の機種別平均結果を表示します。（データ集計開始時点から存在する機種は除外されます）")
     
     if st.button("新台の初日データを抽出する"):
@@ -303,8 +298,13 @@ elif menu == "5. AI・チャット風検索":
                 res_df = pd.DataFrame(results).sort_values('導入/初稼働日', ascending=False)
                 st.success(f"🤖 {len(res_df)}機種の新台データが見つかりました！")
                 st.dataframe(res_df, width="stretch")
+
+# --- 6. AI・チャット風検索 ---
+elif menu == "6. AI・チャット風検索":
+    import re
+    st.header("💬 6. AI・チャット風検索")
+    st.write("質問を入力してください。（例：「ハナハナで最も差枚数が出ている台番は？」「からくりサーカスの勝率は？」など）")
     
-    st.markdown("---")
     query = st.text_input("質問を入力：", placeholder="ハナハナで最も差枚数が出ている台番は？")
     
     if query:
