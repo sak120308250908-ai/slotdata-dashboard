@@ -8,10 +8,14 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 files = glob.glob('/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/*.xlsx')
 files.sort()
 df_list = []
+import unicodedata
+
 # ファイル名の店舗部分を日本語に統一するための辞書
+# 表記ゆれ（半角・全角の違い、スペースの有無など）を吸収
 shop_name_mapping = {
     "castleokane": "キャッスル大金",
-    "playlandcastle takahama": "プレイランドキャッスル高浜"
+    "playlandcastle takahama": "プレイランドキャッスル高浜",
+    "プレイランドキャッスル高浜": "プレイランドキャッスル高浜"
 }
 
 for f in files:
@@ -20,8 +24,17 @@ for f in files:
     parts = filename.split('_')
     raw_store_name = parts[1] if len(parts) >= 2 else "Unknown"
     
-    # 英語名であれば日本語名に変換、既に日本語であればそのまま使用
-    store_name = shop_name_mapping.get(raw_store_name, raw_store_name)
+    # Unicode正規化（全角英数字を半角に、濁点を結合）して小文字化、前後の空白削除
+    normalized_name = unicodedata.normalize('NFKC', raw_store_name).strip().lower()
+    
+    # 辞書に一致すれば日本語に、一致しなければ正規化後の名前を使用
+    store_name = shop_name_mapping.get(normalized_name, raw_store_name)
+    
+    # さらに、もし「プレイランドキャッスル高浜」が含まれていたら強制統一
+    if "プレイランドキャッスル高浜" in normalized_name or "playland" in normalized_name:
+        store_name = "プレイランドキャッスル高浜"
+    elif "大金" in normalized_name or "okane" in normalized_name:
+         store_name = "キャッスル大金"
     
     df = pd.read_excel(f)
     df['店舗'] = store_name
