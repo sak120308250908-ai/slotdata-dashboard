@@ -25,6 +25,16 @@ for f in files:
     
     df = pd.read_excel(f)
     df['店舗'] = store_name
+    
+    # 日付列がない場合（1日分のデータ等）、ファイル名の先頭（YYYYMMDD）から日付を自動生成
+    if '日付' not in df.columns:
+        date_str = parts[0] # 例: '20260303'
+        try:
+            # 8桁の数字（YYYYMMDD）を日付型に変換して全行にセット
+            df['日付'] = pd.to_datetime(date_str, format='%Y%m%d')
+        except Exception as e:
+            print(f"  [Warn] Failed to parse date from filename '{date_str}': {e}")
+            
     print(f'Reading {filename} - {len(df)} rows, Shop: {store_name} (from: {raw_store_name})')
     df_list.append(df)
 
