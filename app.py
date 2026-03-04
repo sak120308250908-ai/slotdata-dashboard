@@ -350,7 +350,7 @@ elif menu == "5. 強力なクロス分析 (曜日×特定日)":
     col1, col2, col3 = st.columns(3)
     with col1:
         target_weekdays = st.multiselect("曜日を選択（複数可）", 
-                                        ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'],
+                                        ['曜日すべて', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'],
                                         default=['曜日すべて'])
         if not target_weekdays or '曜日すべて' in target_weekdays:
             target_weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日']
