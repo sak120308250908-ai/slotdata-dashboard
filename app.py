@@ -62,17 +62,30 @@ except Exception as e:
 st.sidebar.title("🎰 解析メニュー")
 
 # --- 対象店舗の選択 ---
+# 店舗の表示名を変換する辞書
+shop_display_names = {
+    "castleokane": "キャッスル大金",
+    "playlandcastle takahama": "プレイランドキャッスル高浜"
+}
+
 if '店舗' in df.columns:
     shops = sorted(df['店舗'].astype(str).unique().tolist())
     # デフォルトをcastleokaneにする（存在すれば）
     if "castleokane" in shops:
         shops.insert(0, shops.pop(shops.index("castleokane")))
-    selected_shop = st.sidebar.selectbox("🏠 分析対象の店舗", shops)
+        
+    # UIのセレクトボックスの表示名だけを辞書を使って日本語にする
+    selected_shop = st.sidebar.selectbox(
+        "🏠 分析対象の店舗", 
+        shops,
+        format_func=lambda x: shop_display_names.get(x, x)
+    )
     
     # 選択した店舗のデータにフィルタリング
     df = df[df['店舗'] == selected_shop]
+    display_title_shop = shop_display_names.get(selected_shop, selected_shop)
 else:
-    selected_shop = "Castle Okane"
+    display_title_shop = "キャッスル大金"
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
@@ -82,7 +95,7 @@ menu = st.sidebar.radio(
 # --- ヘッダー ---
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
 st.title("🎰 スロットデータ分析ダッシュボード")
-st.markdown(f"**対象店舗**: {selected_shop}")
+st.markdown(f"**対象店舗**: {display_title_shop}")
 st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
 
 
