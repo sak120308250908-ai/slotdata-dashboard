@@ -303,56 +303,56 @@ elif menu == "5. 新台の初日・強弱分析":
                 
                 # 見やすくするためのフォーマット＆色分け関数
                 def format_diff(val):
-                    if val > 0:
-                        return f"+{val:,}"
-                    return f"{val:,}"
+                    try:
+                        num = int(round(float(val)))
+                        if num > 0:
+                            return f"+{num:,}"
+                        return f"{num:,}"
+                    except:
+                        return str(val)
                     
                 def color_negative_red(val):
-                    # valは文字列として入ってくるので、カンマや＋を外して数値化判定
                     try:
-                        clean_val = str(val).replace(',', '').replace('+', '')
-                        num = float(clean_val)
-                        color = 'red' if num < 0 else 'black'
-                        return f'color: {color}'
+                        num = float(str(val).replace(',', '').replace('+', ''))
+                        return 'color: red' if num < 0 else 'color: black'
                     except:
                         return ''
                 
                 # 表示する列の順番を指定（平均差枚数が先）
                 display_cols = ['機種名', '台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率']
                 
-                # Streamlitのカラム設定（右揃え・小数点指定）
-                col_config = {
-                    "台数": st.column_config.NumberColumn("台数", alignment="right"),
-                    "平均差枚数": st.column_config.TextColumn("平均差枚数", alignment="right"), # 文字列(+,カンマつき)として扱うが右寄せ
-                    "平均回転数": st.column_config.TextColumn("平均回転数", alignment="right"), # 文字列(カンマつき)として扱うが右寄せ
-                    "平均BB": st.column_config.NumberColumn("平均BB", format="%.1f", alignment="right"),
-                    "平均RB": st.column_config.NumberColumn("平均RB", format="%.1f", alignment="right"),
-                    "平均ART": st.column_config.NumberColumn("平均ART", format="%.1f", alignment="right"),
-                    "勝率": st.column_config.TextColumn("勝率", alignment="right"),
+                # Pandas Stylerのフォーマット設定（全表で共通使用）
+                style_formats = {
+                    '平均差枚数': format_diff,
+                    '平均回転数': '{:,.0f}',
+                    '平均BB': '{:.1f}',
+                    '平均RB': '{:.1f}',
+                    '平均ART': '{:.1f}'
                 }
                 
                 for date in unique_dates:
                     st.markdown(f"### 📅 {date}")
                     date_df = res_df[res_df['導入/初稼働日'] == date][display_cols].copy()
                     
-                    # カンマや＋のフォーマットを摘要
-                    date_df['平均差枚数'] = date_df['平均差枚数'].apply(format_diff)
-                    date_df['平均回転数'] = date_df['平均回転数'].apply(lambda x: f"{x:,}")
+                    # スタイルとフォーマットを適用（CSSで右寄せ指定）
+                    styled_df = date_df.style.format(style_formats) \
+                                       .applymap(color_negative_red, subset=['平均差枚数']) \
+                                       .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
+                                                       **{'text-align': 'right'})
                     
-                    # スタイル適用（赤字のみ。右寄せはcolumn_configで行う）
-                    styled_df = date_df.style.applymap(color_negative_red, subset=['平均差枚数'])
-                    
-                    st.dataframe(styled_df, width="stretch", column_config=col_config)
+                    # HTMLの表として描画（st.tableを使うことで確実な右寄せと文字色反映が可能）
+                    st.table(styled_df)
                 
                 st.markdown("---")
                 st.write("▼ 全件まとめデータ（ソート・検索用）")
-                # 全件テーブルもフォーマット
-                formatted_res_df = res_df[display_cols + ['導入/初稼働日']].copy()
-                formatted_res_df['平均差枚数'] = formatted_res_df['平均差枚数'].apply(format_diff)
-                formatted_res_df['平均回転数'] = formatted_res_df['平均回転数'].apply(lambda x: f"{x:,}")
                 
-                styled_all_df = formatted_res_df.style.applymap(color_negative_red, subset=['平均差枚数'])
-                st.dataframe(styled_all_df, width="stretch", column_config=col_config)
+                # 全件テーブルもフォーマットして描画
+                formatted_res_df = res_df[display_cols + ['導入/初稼働日']].copy()
+                styled_all_df = formatted_res_df.style.format(style_formats) \
+                                                .applymap(color_negative_red, subset=['平均差枚数']) \
+                                                .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
+                                                                **{'text-align': 'right'})
+                st.dataframe(styled_all_df, width="stretch")
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
