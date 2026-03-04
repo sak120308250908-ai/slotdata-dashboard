@@ -24,11 +24,30 @@ components.html(
     width=0, height=0
 )
 
+import requests
+import io
+
 @st.cache_data(ttl=3600) # 1時間ごとにキャッシュをリセットし最新を取得
 def load_data():
-    # Google Driveの直リンクURL
-    file_path = 'https://drive.google.com/uc?export=download&id=1f4snHPoNaBenKXKvGqQFXKq_7lLRip08'
-    df = pd.read_csv(file_path, low_memory=False)
+    # Google Driveの直リンクURL (ファイルID)
+    file_id = '1f4snHPoNaBenKXKvGqQFXKq_7lLRip08'
+    url = "https://docs.google.com/uc?export=download"
+    
+    session = requests.Session()
+    response = session.get(url, params={'id': file_id}, stream=True)
+    
+    token = None
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            token = value
+            break
+            
+    if token:
+        params = {'id': file_id, 'confirm': token}
+        response = session.get(url, params=params, stream=True)
+        
+    # BytesIOを使ってメモリ上でCSVを読み込む
+    df = pd.read_csv(io.BytesIO(response.content), low_memory=False)
     
     if '機種名（正式名）' in df.columns and '機種名' in df.columns:
         df['機種名'] = df['機種名（正式名）'].fillna(df['機種名'])
