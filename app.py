@@ -320,6 +320,17 @@ elif menu == "5. 新台の初日・強弱分析":
                 # 表示する列の順番を指定（平均差枚数が先）
                 display_cols = ['機種名', '台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率']
                 
+                # Streamlitのカラム設定（右揃え・小数点指定）
+                col_config = {
+                    "台数": st.column_config.NumberColumn("台数", alignment="right"),
+                    "平均差枚数": st.column_config.TextColumn("平均差枚数", alignment="right"), # 文字列(+,カンマつき)として扱うが右寄せ
+                    "平均回転数": st.column_config.TextColumn("平均回転数", alignment="right"), # 文字列(カンマつき)として扱うが右寄せ
+                    "平均BB": st.column_config.NumberColumn("平均BB", format="%.1f", alignment="right"),
+                    "平均RB": st.column_config.NumberColumn("平均RB", format="%.1f", alignment="right"),
+                    "平均ART": st.column_config.NumberColumn("平均ART", format="%.1f", alignment="right"),
+                    "勝率": st.column_config.TextColumn("勝率", alignment="right"),
+                }
+                
                 for date in unique_dates:
                     st.markdown(f"### 📅 {date}")
                     date_df = res_df[res_df['導入/初稼働日'] == date][display_cols].copy()
@@ -328,12 +339,10 @@ elif menu == "5. 新台の初日・強弱分析":
                     date_df['平均差枚数'] = date_df['平均差枚数'].apply(format_diff)
                     date_df['平均回転数'] = date_df['平均回転数'].apply(lambda x: f"{x:,}")
                     
-                    # スタイル適用（赤字＆右寄せ）
-                    styled_df = date_df.style.applymap(color_negative_red, subset=['平均差枚数']) \
-                                       .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
-                                                       **{'text-align': 'right'})
+                    # スタイル適用（赤字のみ。右寄せはcolumn_configで行う）
+                    styled_df = date_df.style.applymap(color_negative_red, subset=['平均差枚数'])
                     
-                    st.dataframe(styled_df, width="stretch")
+                    st.dataframe(styled_df, width="stretch", column_config=col_config)
                 
                 st.markdown("---")
                 st.write("▼ 全件まとめデータ（ソート・検索用）")
@@ -342,10 +351,8 @@ elif menu == "5. 新台の初日・強弱分析":
                 formatted_res_df['平均差枚数'] = formatted_res_df['平均差枚数'].apply(format_diff)
                 formatted_res_df['平均回転数'] = formatted_res_df['平均回転数'].apply(lambda x: f"{x:,}")
                 
-                styled_all_df = formatted_res_df.style.applymap(color_negative_red, subset=['平均差枚数']) \
-                                       .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
-                                                       **{'text-align': 'right'})
-                st.dataframe(styled_all_df, width="stretch")
+                styled_all_df = formatted_res_df.style.applymap(color_negative_red, subset=['平均差枚数'])
+                st.dataframe(styled_all_df, width="stretch", column_config=col_config)
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
