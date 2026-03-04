@@ -1,11 +1,19 @@
 import pandas as pd
-import glob
 import warnings
 import os
+from pathlib import Path
 
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
-files = glob.glob('/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/*.xlsx')
+# 対象となる拡張子
+extensions = ['.xlsx', '.xls']
+base_dir = Path('/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata')
+files = []
+
+# ディレクトリ以下の全ファイルから拡張子が一致するものを抽出（再帰的検索）
+for ext in extensions:
+    files.extend([str(p) for p in base_dir.rglob(f"*{ext}") if not p.name.startswith("~$")])
+
 files.sort()
 df_list = []
 import unicodedata
