@@ -298,6 +298,124 @@ elif menu == "5. 新台の初日・強弱分析":
                 res_df = pd.DataFrame(results).sort_values('導入/初稼働日', ascending=False)
                 st.success(f"🤖 {len(res_df)}機種の新台データが見つかりました！")
                 
+                # 見やすくするためのフォーマット＆色分け関数 (共通利用)
+                def format_diff(val):
+                    try:
+                        num = int(round(float(val)))
+                        if num > 0:
+                            return f"+{num:,}"
+                        return f"{num:,}"
+                    except:
+                        return str(val)
+                    
+                def color_negative_red(val):
+                    try:
+                        num = float(str(val).replace(',', '').replace('+', ''))
+                        return 'color: red' if num < 0 else 'color: black'
+                    except:
+                        return ''
+                        
+                # -------------------------------------------------------------
+                # ▼ 新台 全体の・台数別 サマリー分析
+                # -------------------------------------------------------------
+                st.markdown("---")
+                st.subheader("📊 新台入替分析（全体サマリー）")
+                
+                # 集計用に「勝った台数」と「総差枚」を逆算して求める
+                res_df['総差枚'] = res_df['台数'] * res_df['平均差枚数']
+                
+                # 全体サマリー計算
+                total_machines = res_df['台数'].sum()
+                overall_avg_g = (res_df['台数'] * res_df['平均回転数']).sum() / total_machines if total_machines > 0 else 0
+                total_diff = res_df['総差枚'].sum()
+                overall_avg_diff = total_diff / total_machines if total_machines > 0 else 0
+                
+                # 全体の勝率は「勝った機種数÷全機種」ではなく「各機種の勝率×台数を合計して全体台数で割る」
+                # 今回は簡略化のため元データdfから直接新台の全件を再抽出して勝率を出す
+                all_new_active_records = []
+                for machine in new_machines:
+                    m_df = df[df['機種名'] == machine].sort_values('日付')
+                    active_m_df = m_df[m_df['G数'] > 0]
+                    if len(active_m_df) > 0:
+                        first_active_date = active_m_df['日付'].iloc[0]
+                        all_new_active_records.append(m_df[m_df['日付'] == first_active_date])
+                
+                if all_new_active_records:
+                    all_new_df = pd.concat(all_new_active_records)
+                    overall_win_rate = (all_new_df['差枚'] > 0).mean() * 100
+                else:
+                    overall_win_rate = 0
+                
+                overall_summary = pd.DataFrame([{
+                    '総集計台数': total_machines,
+                    '平均回転数': int(round(overall_avg_g)),
+                    '総差枚': int(round(total_diff)),
+                    '平均差枚数': int(round(overall_avg_diff)),
+                    '勝率': f"{overall_win_rate:.1f}%"
+                }])
+                
+                overall_style_formats = {
+                    '総差枚': format_diff,
+                    '平均差枚数': format_diff,
+                    '平均回転数': '{:,.0f}'
+                }
+                
+                st.table(overall_summary.style.format(overall_style_formats)
+                                              .applymap(color_negative_red, subset=['総差枚', '平均差枚数'])
+                                              .set_properties(**{'text-align': 'right'})
+                                              .hide(axis="index"))
+                
+                # --- 導入台数別分析 ---
+                st.subheader("📊 導入台数別分析")
+                
+                def get_tier(count):
+                    if count == 1: return "1台機種"
+                    elif 2 <= count <= 4: return "2-4台機種"
+                    elif 5 <= count <= 9: return "5-9台機種"
+                    elif 10 <= count <= 19: return "10-19台機種"
+                    else: return "20台以上機種"
+                
+                all_new_df['Tier'] = all_new_df.groupby('機種名')['台番'].transform('count').apply(get_tier)
+                
+                tier_order = ["1台機種", "2-4台機種", "5-9台機種", "10-19台機種", "20台以上機種"]
+                tier_results = []
+                
+                for tier in tier_order:
+                    t_df = all_new_df[all_new_df['Tier'] == tier]
+                    if len(t_df) > 0:
+                        t_machines = len(t_df)
+                        t_avg_g = t_df['G数'].mean()
+                        t_total_diff = t_df['差枚'].sum()
+                        t_avg_diff = t_df['差枚'].mean()
+                        t_win_rate = (t_df['差枚'] > 0).mean() * 100
+                        
+                        tier_results.append({
+                            '導入規模': tier,
+                            '総集計台数': t_machines,
+                            '平均回転数': int(round(t_avg_g)),
+                            '総差枚': int(round(t_total_diff)),
+                            '平均差枚数': int(round(t_avg_diff)),
+                            '勝率': f"{t_win_rate:.1f}%"
+                        })
+                    else:
+                        tier_results.append({
+                            '導入規模': tier,
+                            '総集計台数': 0,
+                            '平均回転数': 0,
+                            '総差枚': 0,
+                            '平均差枚数': 0,
+                            '勝率': "0.0%"
+                        })
+                        
+                tier_summary_df = pd.DataFrame(tier_results)
+                st.table(tier_summary_df.style.format(overall_style_formats)
+                                              .applymap(color_negative_red, subset=['総差枚', '平均差枚数'])
+                                              .set_properties(subset=['総集計台数', '平均回転数', '総差枚', '平均差枚数', '勝率'], **{'text-align': 'right'})
+                                              .hide(axis="index"))
+                
+                st.markdown("---")
+                
+                # -------------------------------------------------------------
                 # 日付ごとにグループ化して表示
                 unique_dates = res_df['導入/初稼働日'].unique()
                 
