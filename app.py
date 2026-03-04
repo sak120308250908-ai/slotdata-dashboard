@@ -24,9 +24,10 @@ components.html(
     width=0, height=0
 )
 
-@st.cache_data
+@st.cache_data(ttl=3600) # 1時間ごとにキャッシュをリセットし最新を取得
 def load_data():
-    file_path = 'cleaned_slot_data.csv'
+    # Google Driveの直リンクURL
+    file_path = 'https://drive.google.com/uc?export=download&id=1f4snHPoNaBenKXKvGqQFXKq_7lLRip08'
     df = pd.read_csv(file_path, low_memory=False)
     
     if '機種名（正式名）' in df.columns and '機種名' in df.columns:
