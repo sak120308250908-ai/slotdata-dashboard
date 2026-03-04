@@ -300,25 +300,52 @@ elif menu == "5. 新台の初日・強弱分析":
                 
                 # 日付ごとにグループ化して表示
                 unique_dates = res_df['導入/初稼働日'].unique()
+                
+                # 見やすくするためのフォーマット＆色分け関数
+                def format_diff(val):
+                    if val > 0:
+                        return f"+{val:,}"
+                    return f"{val:,}"
+                    
+                def color_negative_red(val):
+                    # valは文字列として入ってくるので、カンマや＋を外して数値化判定
+                    try:
+                        clean_val = str(val).replace(',', '').replace('+', '')
+                        num = float(clean_val)
+                        color = 'red' if num < 0 else 'black'
+                        return f'color: {color}'
+                    except:
+                        return ''
+                
+                # 表示する列の順番を指定（平均差枚数が先）
+                display_cols = ['機種名', '台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率']
+                
                 for date in unique_dates:
                     st.markdown(f"### 📅 {date}")
-                    date_df = res_df[res_df['導入/初稼働日'] == date].copy()
+                    date_df = res_df[res_df['導入/初稼働日'] == date][display_cols].copy()
                     
-                    # 見やすくカンマ区切りにフォーマット
+                    # カンマや＋のフォーマットを摘要
+                    date_df['平均差枚数'] = date_df['平均差枚数'].apply(format_diff)
                     date_df['平均回転数'] = date_df['平均回転数'].apply(lambda x: f"{x:,}")
-                    date_df['平均差枚数'] = date_df['平均差枚数'].apply(lambda x: f"{x:,}")
                     
-                    # 導入日は見出しにするので列から除外
-                    display_cols = ['機種名', '台数', '平均回転数', '平均BB', '平均RB', '平均ART', '平均差枚数', '勝率']
-                    st.dataframe(date_df[display_cols], width="stretch")
+                    # スタイル適用（赤字＆右寄せ）
+                    styled_df = date_df.style.applymap(color_negative_red, subset=['平均差枚数']) \
+                                       .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
+                                                       **{'text-align': 'right'})
+                    
+                    st.dataframe(styled_df, width="stretch")
                 
                 st.markdown("---")
                 st.write("▼ 全件まとめデータ（ソート・検索用）")
                 # 全件テーブルもフォーマット
-                formatted_res_df = res_df.copy()
+                formatted_res_df = res_df[display_cols + ['導入/初稼働日']].copy()
+                formatted_res_df['平均差枚数'] = formatted_res_df['平均差枚数'].apply(format_diff)
                 formatted_res_df['平均回転数'] = formatted_res_df['平均回転数'].apply(lambda x: f"{x:,}")
-                formatted_res_df['平均差枚数'] = formatted_res_df['平均差枚数'].apply(lambda x: f"{x:,}")
-                st.dataframe(formatted_res_df, width="stretch")
+                
+                styled_all_df = formatted_res_df.style.applymap(color_negative_red, subset=['平均差枚数']) \
+                                       .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
+                                                       **{'text-align': 'right'})
+                st.dataframe(styled_all_df, width="stretch")
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
