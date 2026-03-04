@@ -283,37 +283,52 @@ elif menu == "5. AI・チャット風検索":
             if y_str:
                 y_num = int(y_str)
                 res = df[(df['日付'].dt.year == y_num) & (df['Month'] == m_num) & (df['Day'] == d_num)]
-                title_str = f"{y_num}年{m_num}月{d_num}日"
+                years_to_display = [y_num]
             else:
                 res = df[(df['Month'] == m_num) & (df['Day'] == d_num)]
-                title_str = f"{m_num}月{d_num}日（全年度）"
+                # 存在する年を新しい順（降順）リストとして取得
+                years_to_display = sorted(res['日付'].dt.year.unique().tolist(), reverse=True)
                 
             if len(res) == 0:
-                st.warning(f"「{title_str}」のデータは見つかりませんでした。")
+                if y_str:
+                    st.warning(f"「{y_num}年{m_num}月{d_num}日」のデータは見つかりませんでした。")
+                else:
+                    st.warning(f"「{m_num}月{d_num}日」のデータは見つかりませんでした。")
             else:
-                st.success(f"🤖 回答: {title_str} のデータが見つかりました！（{len(res)}件）")
+                st.success(f"🤖 回答: {m_num}月{d_num}日 のデータが見つかりました！（合計 {len(res)}件）")
                 
-                # サマリー情報
-                col1, col2, col3 = st.columns(3)
-                col1.metric("稼働台数", f"{len(res):,}台")
-                col2.metric("平均差枚数", f"{res['差枚'].mean():+,.0f}枚")
-                col3.metric("勝率", f"{res['Win'].mean() * 100:.1f}%")
-                
-                st.write(f"▼ {title_str} の優秀台ランキング（差枚数順 トップ20）")
-                top_machines = res.sort_values('差枚', ascending=False).head(20)
-                
-                # 日付列が見やすいように文字列にフォーマット
-                top_machines['日付'] = top_machines['日付'].dt.strftime('%Y-%m-%d')
-                
-                display_cols = ['日付', '店舗', '機種名', '台番', '差枚', 'G数']
-                display_cols = [c for c in display_cols if c in res.columns]
-                
-                st.dataframe(top_machines[display_cols], width="stretch")
-                
-                with st.expander("全データを見る"):
-                    all_res = res.sort_values('差枚', ascending=False).copy()
-                    all_res['日付'] = all_res['日付'].dt.strftime('%Y-%m-%d')
-                    st.dataframe(all_res, width="stretch")
+                # 年ごとにデータを分割して表示
+                for y in years_to_display:
+                    year_res = res[res['日付'].dt.year == y]
+                    if len(year_res) == 0:
+                        continue
+                        
+                    title_str = f"📅 {y}年{m_num}月{d_num}日のデータ"
+                    st.subheader(title_str)
+                    
+                    # サマリー情報
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("稼働台数", f"{len(year_res):,}台")
+                    col2.metric("平均差枚数", f"{year_res['差枚'].mean():+,.0f}枚")
+                    col3.metric("勝率", f"{year_res['Win'].mean() * 100:.1f}%")
+                    
+                    st.write(f"▼ {y}年{m_num}月{d_num}日の優秀台ランキング（差枚数順 トップ20）")
+                    top_machines = year_res.sort_values('差枚', ascending=False).head(20).copy()
+                    
+                    # 日付列が見やすいように文字列にフォーマット
+                    top_machines['日付'] = top_machines['日付'].dt.strftime('%Y-%m-%d')
+                    
+                    display_cols = ['日付', '店舗', '機種名', '台番', '差枚', 'G数']
+                    display_cols = [c for c in display_cols if c in year_res.columns]
+                    
+                    st.dataframe(top_machines[display_cols], width="stretch")
+                    
+                    with st.expander(f"{y}年{m_num}月{d_num}日の全データを見る"):
+                        all_res = year_res.sort_values('差枚', ascending=False).copy()
+                        all_res['日付'] = all_res['日付'].dt.strftime('%Y-%m-%d')
+                        st.dataframe(all_res, width="stretch")
+                    
+                    st.markdown("---")
 
         elif match_date_machine:
             target_num = int(match_date_machine.group(1))
