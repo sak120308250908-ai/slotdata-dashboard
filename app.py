@@ -241,6 +241,9 @@ elif menu == "5. AI・チャット風検索":
     query = st.text_input("質問を入力：", placeholder="ハナハナで最も差枚数が出ている台番は？")
     
     if query:
+        # パターン0: 特定の日付検索 (例: 2/28, 2月28日, 2026/2/28)
+        match_specific_date = re.fullmatch(r'(?:(20\d{2})[年/])?([0-1]?[0-9])[月/]([0-3]?[0-9])日?\s*(のデータ)?', query.strip())
+        
         # パターン1: 「[機種名]で最も差枚数が出ている台番は？」
         match_top_machine = re.search(r'(.*?)で(最も|一番)(差枚|差枚数)が出ている(台番|台)は[？?]?', query)
         
@@ -250,7 +253,50 @@ elif menu == "5. AI・チャット風検索":
         # パターン3: 「[数字]のつく日(または[数字]日)に(台)平均差枚が多い(高い)機種は？」
         match_date_machine = re.search(r'([0-9]+)(のつく日|日)に[台\s]*平均差枚が(多い|高い|一番|トップ)機種は[？?]?', query)
         
-        if match_date_machine:
+        if match_specific_date:
+            y_str = match_specific_date.group(1)
+            m_str = match_specific_date.group(2)
+            d_str = match_specific_date.group(3)
+            
+            m_num = int(m_str)
+            d_num = int(d_str)
+            
+            if y_str:
+                y_num = int(y_str)
+                res = df[(df['日付'].dt.year == y_num) & (df['Month'] == m_num) & (df['Day'] == d_num)]
+                title_str = f"{y_num}年{m_num}月{d_num}日"
+            else:
+                res = df[(df['Month'] == m_num) & (df['Day'] == d_num)]
+                title_str = f"{m_num}月{d_num}日（全年度）"
+                
+            if len(res) == 0:
+                st.warning(f"「{title_str}」のデータは見つかりませんでした。")
+            else:
+                st.success(f"🤖 回答: {title_str} のデータが見つかりました！（{len(res)}件）")
+                
+                # サマリー情報
+                col1, col2, col3 = st.columns(3)
+                col1.metric("稼働台数", f"{len(res):,}台")
+                col2.metric("平均差枚数", f"{res['差枚'].mean():+,.0f}枚")
+                col3.metric("勝率", f"{res['Win'].mean() * 100:.1f}%")
+                
+                st.write(f"▼ {title_str} の優秀台ランキング（差枚数順 トップ20）")
+                top_machines = res.sort_values('差枚', ascending=False).head(20)
+                
+                # 日付列が見やすいように文字列にフォーマット
+                top_machines['日付'] = top_machines['日付'].dt.strftime('%Y-%m-%d')
+                
+                display_cols = ['日付', '店舗', '機種名', '台番', '差枚', 'G数']
+                display_cols = [c for c in display_cols if c in res.columns]
+                
+                st.dataframe(top_machines[display_cols], width="stretch")
+                
+                with st.expander("全データを見る"):
+                    all_res = res.sort_values('差枚', ascending=False).copy()
+                    all_res['日付'] = all_res['日付'].dt.strftime('%Y-%m-%d')
+                    st.dataframe(all_res, width="stretch")
+
+        elif match_date_machine:
             target_num = int(match_date_machine.group(1))
             date_type = match_date_machine.group(2)
             
