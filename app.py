@@ -76,7 +76,7 @@ else:
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
-    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. AI・チャット風検索")
+    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. AI・チャット風検索", "5. 強力なクロス分析 (曜日×特定日)")
 )
 
 # --- ヘッダー ---
@@ -153,6 +153,24 @@ elif menu == "2. カレンダー・曜日分析":
                        title="曜日別の勝率", markers=True)
         fig2.update_layout(yaxis=dict(tickformat=".0%"))
         st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🔍 曜日別の「強い機種」ランキング")
+    target_weekday = st.selectbox("分析したい曜日を選択", ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'], index=5)
+    min_count_w = st.number_input("最低サンプル数", min_value=1, value=30, key="min_count_weekday")
+    
+    w_df = df[df['Weekday'] == target_weekday]
+    w_machine_stats = w_df.groupby('機種名').agg(
+        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
+    ).reset_index()
+    
+    w_filtered_stats = w_machine_stats[w_machine_stats['Count'] >= min_count_w].sort_values('Avg_Samaisu', ascending=False).head(15)
+    w_filtered_stats['Win_Rate'] = (w_filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
+    w_filtered_stats['Avg_Samaisu'] = w_filtered_stats['Avg_Samaisu'].round().astype(int)
+    w_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
+    
+    st.write(f"**{target_weekday}** の優良機種トップ15 (サンプル数{min_count_w}以上)")
+    st.dataframe(w_filtered_stats, width="stretch")
 
 
 # --- 3. 機種別詳細分析 ---
@@ -323,3 +341,60 @@ elif menu == "4. AI・チャット風検索":
                     st.dataframe(summary, width="stretch")
                 else:
                     st.warning("該当するデータが見つかりませんでした。「ハナハナで一番差枚数が出ている台番は？」のように質問するか、機種名を入力してください。")
+
+# --- 5. 強力なクロス分析 (曜日×特定日) ---
+elif menu == "5. 強力なクロス分析 (曜日×特定日)":
+    st.header("🔍 5. 強力なクロス分析 (曜日 × 特定日)")
+    st.write("「曜日」と「特定日（日付または末尾）」を組み合わせて、ピンポイントな状況を分析できます。")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        target_weekdays = st.multiselect("曜日を選択（複数可）", 
+                                        ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'],
+                                        default=['曜日すべて'])
+        if not target_weekdays or '曜日すべて' in target_weekdays:
+            target_weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日']
+            
+    with col2:
+        filter_type = st.radio("特定日条件の種類", ["日付指定 (1〜31日)", "末尾指定 (0〜9の付く日)"])
+        
+    with col3:
+        if filter_type == "日付指定 (1〜31日)":
+            target_val = st.number_input("日付を入力", 1, 31, 6)
+        else:
+            target_val = st.number_input("末尾番号を入力", 0, 9, 6)
+            
+    # データフィルタリング
+    cross_df = df[df['Weekday'].isin(target_weekdays)]
+    if filter_type == "日付指定 (1〜31日)":
+        cross_df = cross_df[cross_df['Day'] == target_val]
+        cond_str = f"{target_val}日"
+    else:
+        cross_df = cross_df[cross_df['End_Digit'] == target_val]
+        cond_str = f"末尾{target_val}の日"
+        
+    st.markdown("---")
+    if len(cross_df) == 0:
+        st.warning("選択された条件に合致するデータが見つかりませんでした。条件を変えてお試しください。")
+    else:
+        st.subheader(f"📊 分析結果: 【{', '.join(target_weekdays)}】 × 【{cond_str}】")
+        
+        # 基本データの表示
+        c1, c2, c3 = st.columns(3)
+        c1.metric("対象データ件数", f"{len(cross_df):,}件")
+        c2.metric("平均差枚数", f"{cross_df['差枚'].mean():.1f}枚")
+        c3.metric("平均勝率", f"{cross_df['Win'].mean() * 100:.1f}%")
+        
+        st.write("▼ この条件下での優良機種ランキング")
+        min_count_c = st.number_input("最低サンプル数", min_value=1, value=5, key="min_count_cross")
+        
+        c_machine_stats = cross_df.groupby('機種名').agg(
+            Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
+        ).reset_index()
+        
+        c_filtered_stats = c_machine_stats[c_machine_stats['Count'] >= min_count_c].sort_values('Avg_Samaisu', ascending=False).head(20)
+        c_filtered_stats['Win_Rate'] = (c_filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
+        c_filtered_stats['Avg_Samaisu'] = c_filtered_stats['Avg_Samaisu'].round().astype(int)
+        c_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
+        st.dataframe(c_filtered_stats, width="stretch")
+
