@@ -338,7 +338,8 @@ elif menu == "5. 新台の初日・強弱分析":
                     styled_df = date_df.style.format(style_formats) \
                                        .applymap(color_negative_red, subset=['平均差枚数']) \
                                        .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
-                                                       **{'text-align': 'right'})
+                                                       **{'text-align': 'right'}) \
+                                       .hide(axis="index")
                     
                     # HTMLの表として描画（st.tableを使うことで確実な右寄せと文字色反映が可能）
                     st.table(styled_df)
@@ -352,7 +353,7 @@ elif menu == "5. 新台の初日・強弱分析":
                                                 .applymap(color_negative_red, subset=['平均差枚数']) \
                                                 .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
                                                                 **{'text-align': 'right'})
-                st.dataframe(styled_all_df, width="stretch")
+                st.dataframe(styled_all_df, width="stretch", hide_index=True)
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
