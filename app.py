@@ -287,17 +287,38 @@ elif menu == "5. 新台の初日・強弱分析":
                             '機種名': machine,
                             '導入/初稼働日': first_active_date.strftime('%Y-%m-%d'),
                             '台数': len(target_df),
-                            '平均回転数': round(avg_g, 1),
+                            '平均回転数': int(round(avg_g)),    # 小数点なし
                             '平均BB': round(avg_bb, 1),
                             '平均RB': round(avg_rb, 1),
                             '平均ART': round(avg_art, 1),
-                            '平均差枚数': round(avg_diff, 1),
+                            '平均差枚数': int(round(avg_diff)), # 小数点なし
                             '勝率': f"{win_rate:.1f}%"
                         })
                 
                 res_df = pd.DataFrame(results).sort_values('導入/初稼働日', ascending=False)
                 st.success(f"🤖 {len(res_df)}機種の新台データが見つかりました！")
-                st.dataframe(res_df, width="stretch")
+                
+                # 日付ごとにグループ化して表示
+                unique_dates = res_df['導入/初稼働日'].unique()
+                for date in unique_dates:
+                    st.markdown(f"### 📅 {date}")
+                    date_df = res_df[res_df['導入/初稼働日'] == date].copy()
+                    
+                    # 見やすくカンマ区切りにフォーマット
+                    date_df['平均回転数'] = date_df['平均回転数'].apply(lambda x: f"{x:,}")
+                    date_df['平均差枚数'] = date_df['平均差枚数'].apply(lambda x: f"{x:,}")
+                    
+                    # 導入日は見出しにするので列から除外
+                    display_cols = ['機種名', '台数', '平均回転数', '平均BB', '平均RB', '平均ART', '平均差枚数', '勝率']
+                    st.dataframe(date_df[display_cols], width="stretch")
+                
+                st.markdown("---")
+                st.write("▼ 全件まとめデータ（ソート・検索用）")
+                # 全件テーブルもフォーマット
+                formatted_res_df = res_df.copy()
+                formatted_res_df['平均回転数'] = formatted_res_df['平均回転数'].apply(lambda x: f"{x:,}")
+                formatted_res_df['平均差枚数'] = formatted_res_df['平均差枚数'].apply(lambda x: f"{x:,}")
+                st.dataframe(formatted_res_df, width="stretch")
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
