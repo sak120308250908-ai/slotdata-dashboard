@@ -91,30 +91,117 @@ def fetch_store_data(store_name):
 # --- サイドバー ---
 st.sidebar.title("🎰 解析メニュー")
 
+st.sidebar.markdown("### 🌐 全店横断分析モード")
+cross_menu = st.sidebar.radio(
+    "横断メニューを選択",
+    ["選択しない", "新台分析", "特定機種分析"],
+    index=0,
+    key="cross_menu_radio"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🏠 店舗個別分析モード")
+
 # 固定の店舗リスト（データベースへの毎回のDistinctクエリ負荷を避けるためハードコード）
 shops = sorted(['プレイランドキャッスル知多にしの台', 'プレイランドキャッスル東郷', 'キング観光サウザンド生桑', 'JP888', 'キング観光尾鷲', 'メガコンコルド大口41号通り', 'プレイランドキャッスル高浜', 'A-FLAG津', 'KYORAKU妙音通', 'プレイランドキャッスル知多東海', 'メガコンコルド名古屋みなと23号通り', 'プレイランドキャッスル天白', 'タイキ豊橋藤沢', 'ラッキー1番日進竹の山', 'リブレ遊援館', 'プレイランドキャッスルワンダー', '玉越中川', 'キング観光サウザンド津', 'キャッスル大金', 'パーラーワールド小牧', 'ZENT岡崎インター', 'ZENT刈谷', 'キング観光サウザンド桑名本店', 'コスモジャパン三谷', 'キング観光サウザンド松阪', 'キング観光サウザンド栄若宮大通', 'メガコンコルド豊川インター', 'がちゃぽん南', 'KEIZ港', 'キクヤ長良', 'ZENT住吉', 'キング観光笠寺', 'キング観光サウザンド栄東新町', 'サンシャインKYORAKU平針', 'プレイランドキャッスル尾頭橋', 'プレイランドキャッスル記念橋南', 'タイキ四日市泊小柳', 'ラッキープラザ弥富', 'ラッキープラザ津島', 'キング観光サウザンド近鉄四日市', 'KYORAKU西', 'メガコンコルド春日井', 'ラッキープラザ可児', 'メガコンコルドみなと木場インター', 'オーギヤタウン半田', 'メガコンコルドBLAZE', 'コスモジャパン大府', 'マルシン777', 'コンコルド愛西日比野駅前', 'ZENT扶桑', 'ZENT各務原', 'キャッスル岩倉', 'キング観光鈴鹿インター', 'プレイランドキャッスル上社', 'サンパレス', 'オーギヤ安城', 'キング観光名張', 'プレイランドキャッスル小牧', 'メガコンコルド刈谷知立', 'プレイランド第一平和', 'キング観光いなべ', 'キング観光サウザンド今池2号', 'コスモジャパン蒲郡', 'ZENT豊橋藤沢店', 'ZENT木曽川', 'メガガイア一宮', 'メガコンコルド稲沢', 'プレイランドキャッスル知多', 'プレイランドキャッスル大垣', 'キング666飛騨高山', 'M&K岡崎', 'MGM四日市', 'ゴー港', 'キクヤ島', 'グランドオータ鳴海', 'ZENT長久手', 'キング観光熊野', 'オータ岡崎', 'KEIZ中川運河', 'メガコンコルド岡崎インター', 'M&K道光寺', 'M&K本店', 'ラッキー1番江南', 'プレイランドキャッスル大曽根', 'ラッキープラザ関', 'A-FLAG瀬戸', 'キクヤ春日井', 'キング666一宮', 'ZENT稲沢', 'キング観光サウザンド桑名サンシパーク', 'メガコンコルド西尾', 'ZENT名古屋北', 'キング観光新瑞', 'キング666半田', 'プレイランドキャッスル春日井', 'プレイランドキャッスル熱田', 'コンコルド岐阜羽島駅前', 'グランワールドカップ本巣', '大丸桜山', 'ZENT市ノ坪', 'コスモジャパン西尾', 'パチンコ立岩', 'ラッキープラザ名古屋西インター七宝', 'ZENT可児', 'メガコンコルド岡崎北', 'キクヤ穂積', 'KYORAKU東海', 'ZENT梅坪', 'ZENT555', 'コンコルド一宮尾西インター', 'G&L一宮', 'ABC豊川', 'メガコンコルド大垣インター南', 'キング666東海', 'ミカド観光半田', 'キング観光サウザンド鈴鹿', 'メガコンコルド豊田インター', 'ZENT豊田本店', 'メガスロットコンコルド吉浜', 'キクヤ本店'])
 
-# キャッスル大金を初期表示にする
-if "キャッスル大金" in shops:
-    shops.insert(0, shops.pop(shops.index("キャッスル大金")))
+# 選択された店舗の管理 (クロス分析からのジャンプ対応)
+if "go_to_shop" in st.session_state:
+    default_shop = st.session_state["go_to_shop"]
+    if default_shop in shops:
+        default_index = shops.index(default_shop)
+    else:
+        default_index = shops.index("キャッスル大金") if "キャッスル大金" in shops else 0
+    del st.session_state["go_to_shop"]
+else:
+    default_index = shops.index("キャッスル大金") if "キャッスル大金" in shops else 0
 
-selected_shop = st.sidebar.selectbox("🏠 分析対象の店舗", shops)
-
-# 選択された店舗のデータのみをSupabaseから取得してDataFrame化
-try:
-    df = fetch_store_data(selected_shop)
-except Exception as e:
-    st.error(f"データの読み込みに失敗しました: {e}")
-    st.stop()
+selected_shop = st.sidebar.selectbox("🏠 分析対象の店舗", shops, index=default_index)
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
     ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索")
 )
 
-# --- ヘッダー ---
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
-st.title("🎰 スロットデータ分析ダッシュボード")
+
+# -----------------
+# 全店横断モード
+# -----------------
+import os
+if cross_menu != "選択しない":
+    st.title("🌐 全店横断分析ランキング")
+    st.write("各店舗の傾向を横断比較します。**👇 下記テーブルの「店名」行をクリックすると、その店舗の詳細分析ページへジャンプします！**")
+    
+    if cross_menu == "新台分析":
+        st.header("✨ 新台初日が強い店ランキング")
+        cross_new_file = "cross_new_machine_stats.csv"
+        if os.path.exists(cross_new_file):
+            cross_new_df = pd.read_csv(cross_new_file)
+            cross_new_df.columns = ['店名', '新台入替回数', '総導入台数', '平均差枚数', '勝率']
+            cross_new_df['勝率'] = (cross_new_df['勝率'] * 100).round(1).astype(str) + "%"
+            cross_new_df['平均差枚数'] = cross_new_df['平均差枚数'].round().astype(int)
+            
+            event = st.dataframe(
+                cross_new_df,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                hide_index=True
+            )
+            if len(event.selection.rows) > 0:
+                clicked_shop = cross_new_df.iloc[event.selection.rows[0]]['店名']
+                st.session_state["go_to_shop"] = clicked_shop
+                st.session_state["cross_menu_radio"] = "選択しない"
+                st.rerun()
+        else:
+            st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
+            
+    elif cross_menu == "特定機種分析":
+        st.header("🎯 特定機種が強い店ランキング")
+        cross_machine_file = "cross_machine_stats.csv"
+        if os.path.exists(cross_machine_file):
+            cross_m_df = pd.read_csv(cross_machine_file)
+            cross_m_df.columns = ['店名', '機種名', '総導入台数', '平均差枚数', '勝率']
+            
+            machine_list = sorted(list(cross_m_df['機種名'].dropna().unique()))
+            default_m_idx = machine_list.index("スマスロ北斗の拳") if "スマスロ北斗の拳" in machine_list else 0
+            selected_machine = st.selectbox("分析したい機種を選択", machine_list, index=default_m_idx)
+            
+            display_df = cross_m_df[cross_m_df['機種名'] == selected_machine].copy()
+            display_df = display_df.sort_values("平均差枚数", ascending=False)
+            display_df.drop("機種名", axis=1, inplace=True)
+            
+            display_df['勝率'] = (display_df['勝率'] * 100).round(1).astype(str) + "%"
+            display_df['平均差枚数'] = display_df['平均差枚数'].round().astype(int)
+            
+            event = st.dataframe(
+                display_df,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                hide_index=True
+            )
+            if len(event.selection.rows) > 0:
+                clicked_shop = display_df.iloc[event.selection.rows[0]]['店名']
+                st.session_state["go_to_shop"] = clicked_shop
+                st.session_state["cross_menu_radio"] = "選択しない"
+                st.rerun()
+        else:
+            st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
+            
+    st.stop()  # 全店横断モードの場合は下の店舗別処理を行わない
+
+# -----------------
+# 以下は従来の店舗個別モード
+# -----------------
+try:
+    df = fetch_store_data(selected_shop)
+except Exception as e:
+    st.error(f"データの読み込みに失敗しました: {e}")
+    st.stop()
+
+st.title("🎰 スロットデータ店舗分析ダッシュボード")
 st.markdown(f"**対象店舗**: {selected_shop}")
 if len(df) > 0:
     st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
@@ -154,7 +241,8 @@ if menu == "1. 全体サマリー＆特定日分析":
     st.markdown("---")
     st.subheader("🔍 特定日の「強い機種」ランキング")
     target_day = st.slider("日付（1〜31）を選択", 1, 31, 6)
-    min_count = st.number_input("最低サンプル数", min_value=1, value=5)
+    min_count_str = st.radio("最低サンプル数の絞り込み", ["5以上", "10以上", "20以上"], horizontal=True)
+    min_count = int(min_count_str.replace("以上", ""))
     
     target_df = df[df['Day'] == target_day]
     machine_stats = target_df.groupby('機種名').agg(
@@ -193,7 +281,8 @@ elif menu == "2. カレンダー・曜日分析":
     st.markdown("---")
     st.subheader("🔍 曜日別の「強い機種」ランキング")
     target_weekday = st.selectbox("分析したい曜日を選択", ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'], index=5)
-    min_count_w = st.number_input("最低サンプル数", min_value=1, value=5, key="min_count_weekday")
+    min_count_w_str = st.radio("最低サンプル数の絞り込み", ["5以上", "10以上", "20以上"], horizontal=True, key="min_count_weekday_radio")
+    min_count_w = int(min_count_w_str.replace("以上", ""))
     
     w_df = df[df['Weekday'] == target_weekday]
     w_machine_stats = w_df.groupby('機種名').agg(
