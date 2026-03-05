@@ -39,7 +39,7 @@ supabase = init_connection()
 @st.cache_data(ttl=3600)
 def fetch_store_data(store_name):
     all_data = []
-    limit = 10000
+    limit = 1000
     offset = 0
     
     # Supabaseから指定店舗の全データをページネーションで取得
