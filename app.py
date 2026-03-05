@@ -107,7 +107,10 @@ menu = st.sidebar.radio(
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
 st.title("🎰 スロットデータ分析ダッシュボード")
 st.markdown(f"**対象店舗**: {selected_shop}")
-st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
+if len(df) > 0:
+    st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
+else:
+    st.markdown(f"**データ件数**: 0件 (現在データベースへアップロード処理中です。しばらくお待ちください...)")
 
 
 # --- 1. 全体サマリー＆特定日分析 ---
