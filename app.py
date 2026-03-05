@@ -163,14 +163,14 @@ if cross_menu != "選択しない":
                 on_select="rerun",
                 selection_mode="single-row",
                 hide_index=True,
-                key="cross_new_df_table"
+                key=f"cross_new_df_table_{st.session_state.get('df_key_suffix', 0)}"
             )
             if len(event.selection.rows) > 0:
                 clicked_shop = cross_new_df.iloc[event.selection.rows[0]]['店名']
                 st.session_state["go_to_shop"] = clicked_shop
                 st.session_state["force_cross_menu"] = "選択しない"
-                # Clear the table selection so it doesn't immediately re-trigger
-                st.session_state["cross_new_df_table"] = {"selection": {"rows": [], "columns": []}}
+                # Force a new data frame to render next time to clear selection
+                st.session_state["df_key_suffix"] = st.session_state.get("df_key_suffix", 0) + 1
                 st.rerun()
         else:
             st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
@@ -199,14 +199,14 @@ if cross_menu != "選択しない":
                 on_select="rerun",
                 selection_mode="single-row",
                 hide_index=True,
-                key="cross_machine_df_table"
+                key=f"cross_machine_df_table_{st.session_state.get('df_key_suffix', 0)}"
             )
             if len(event.selection.rows) > 0:
                 clicked_shop = display_df.iloc[event.selection.rows[0]]['店名']
                 st.session_state["go_to_shop"] = clicked_shop
                 st.session_state["force_cross_menu"] = "選択しない"
-                # Clear the table selection so it doesn't immediately re-trigger
-                st.session_state["cross_machine_df_table"] = {"selection": {"rows": [], "columns": []}}
+                # Force a new data frame to render next time to clear selection
+                st.session_state["df_key_suffix"] = st.session_state.get("df_key_suffix", 0) + 1
                 st.rerun()
         else:
             st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
