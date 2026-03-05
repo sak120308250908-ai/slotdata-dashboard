@@ -140,7 +140,7 @@ if menu == "1. 全体サマリー＆特定日分析":
         day_stats['Win_Rate'] = (day_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
         day_stats['Avg_Samaisu'] = day_stats['Avg_Samaisu'].round().astype(int)
         day_stats.columns = ['日付', '平均差枚数', '勝率', 'サンプル数']
-        st.dataframe(day_stats, width="stretch")
+        st.dataframe(day_stats, use_container_width=True)
 
     st.markdown("---")
     st.subheader("🔍 特定日の「強い機種」ランキング")
@@ -158,7 +158,7 @@ if menu == "1. 全体サマリー＆特定日分析":
     filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
     
     st.write(f"毎月 **{target_day}日** の優良機種トップ15 (サンプル数{min_count}以上)")
-    st.dataframe(filtered_stats, width="stretch")
+    st.dataframe(filtered_stats, use_container_width=True)
 
 
 # --- 2. カレンダー・曜日分析 ---
@@ -197,7 +197,7 @@ elif menu == "2. カレンダー・曜日分析":
     w_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
     
     st.write(f"**{target_weekday}** の優良機種トップ15 (サンプル数{min_count_w}以上)")
-    st.dataframe(w_filtered_stats, width="stretch")
+    st.dataframe(w_filtered_stats, use_container_width=True)
 
 
 # --- 3. 機種別詳細分析 ---
@@ -475,7 +475,7 @@ elif menu == "5. 新台の初日・強弱分析":
                                                 .applymap(color_negative_red, subset=['平均差枚数']) \
                                                 .set_properties(subset=['台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率'], 
                                                                 **{'text-align': 'right'})
-                st.dataframe(styled_all_df, width="stretch", hide_index=True)
+                st.dataframe(styled_all_df, use_container_width=True, hide_index=True)
 
 # --- 6. AI・チャット風検索 ---
 elif menu == "6. AI・チャット風検索":
@@ -547,12 +547,12 @@ elif menu == "6. AI・チャット風検索":
                     display_cols = ['日付', '店舗', '機種名', '台番', '差枚', 'G数']
                     display_cols = [c for c in display_cols if c in year_res.columns]
                     
-                    st.dataframe(top_machines[display_cols], width="stretch")
+                    st.dataframe(top_machines[display_cols], use_container_width=True)
                     
                     with st.expander(f"{y}年{m_num}月{d_num}日の全データを見る"):
                         all_res = year_res.sort_values('差枚', ascending=False).copy()
                         all_res['日付'] = all_res['日付'].dt.strftime('%Y-%m-%d')
-                        st.dataframe(all_res, width="stretch")
+                        st.dataframe(all_res, use_container_width=True)
                     
                     st.markdown("---")
 
@@ -586,7 +586,7 @@ elif menu == "6. AI・チャット風検索":
                 
                 # 列の並び替え
                 display_df = filtered_stats[['機種名', '累計差枚数', '稼働日数', '稼働台数', '1日平均差枚数']]
-                st.dataframe(display_df.head(20), width="stretch")
+                st.dataframe(display_df.head(20), use_container_width=True)
 
         elif match_top_machine:
             target_machine = match_top_machine.group(1).strip()
@@ -616,7 +616,7 @@ elif menu == "6. AI・チャット風検索":
                 display_df = daiban_stats.sort_values('差枚', ascending=False).head(10)
                 display_df = display_df[['台番', '機種名', '差枚', '稼働日数', '1日平均差枚']]
                 display_df.columns = ['台番', '機種名', '累計差枚数', '稼働日数', '1日平均差枚数']
-                st.dataframe(display_df, width="stretch")
+                st.dataframe(display_df, use_container_width=True)
                 
         elif match_win_rate:
             target_machine = match_win_rate.group(1).strip()
@@ -639,7 +639,7 @@ elif menu == "6. AI・チャット風検索":
             if query.isdigit():
                 res = df[df['台番'] == int(query)]
                 st.info(f"台番 {query} の稼働履歴（{len(res)}件）を表示します：")
-                st.dataframe(res.sort_values("日付", ascending=False).head(50), width="stretch")
+                st.dataframe(res.sort_values("日付", ascending=False).head(50), use_container_width=True)
             else:
                 res = df[df['機種名'].str.contains(query, na=False)]
                 if len(res) > 0:
@@ -648,7 +648,7 @@ elif menu == "6. AI・チャット風検索":
                         Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
                     ).sort_values('Avg_Samaisu', ascending=False)
                     summary['Win_Rate'] = (summary['Win_Rate'] * 100).round(1).astype(str) + "%"
-                    st.dataframe(summary, width="stretch")
+                    st.dataframe(summary, use_container_width=True)
                 else:
                     st.warning("該当するデータが見つかりませんでした。「ハナハナで一番差枚数が出ている台番は？」のように質問するか、機種名を入力してください。")
 
@@ -706,5 +706,5 @@ elif menu == "4. 強力なクロス分析 (曜日×特定日)":
         c_filtered_stats['Win_Rate'] = (c_filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
         c_filtered_stats['Avg_Samaisu'] = c_filtered_stats['Avg_Samaisu'].round().astype(int)
         c_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
-        st.dataframe(c_filtered_stats, width="stretch")
+        st.dataframe(c_filtered_stats, use_container_width=True)
 
