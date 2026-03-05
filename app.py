@@ -82,6 +82,10 @@ def fetch_store_data(store_name):
     # 差枚列のクレンジング（文字混入等を考慮）
     df['差枚'] = pd.to_numeric(df['差枚'], errors='coerce').fillna(0)
     df['Win'] = (df['差枚'] > 0).astype(int)
+    
+    # 機種名がNoneだとgroupby時にごっそり抜け落ちるため、「不明」で埋める
+    df['機種名'] = df['機種名'].fillna('不明')
+    
     return df
 
 # --- サイドバー ---
