@@ -92,10 +92,17 @@ def fetch_store_data(store_name):
 st.sidebar.title("🎰 解析メニュー")
 
 st.sidebar.markdown("### 🌐 全店横断分析モード")
+
+if "force_cross_menu" in st.session_state:
+    default_cross_index = ["選択しない", "新台分析", "特定機種分析"].index(st.session_state["force_cross_menu"])
+    del st.session_state["force_cross_menu"]
+else:
+    default_cross_index = 0
+
 cross_menu = st.sidebar.radio(
     "横断メニューを選択",
     ["選択しない", "新台分析", "特定機種分析"],
-    index=0,
+    index=default_cross_index,
     key="cross_menu_radio"
 )
 
@@ -152,7 +159,7 @@ if cross_menu != "選択しない":
             if len(event.selection.rows) > 0:
                 clicked_shop = cross_new_df.iloc[event.selection.rows[0]]['店名']
                 st.session_state["go_to_shop"] = clicked_shop
-                st.session_state["cross_menu_radio"] = "選択しない"
+                st.session_state["force_cross_menu"] = "選択しない"
                 st.rerun()
         else:
             st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
@@ -185,7 +192,7 @@ if cross_menu != "選択しない":
             if len(event.selection.rows) > 0:
                 clicked_shop = display_df.iloc[event.selection.rows[0]]['店名']
                 st.session_state["go_to_shop"] = clicked_shop
-                st.session_state["cross_menu_radio"] = "選択しない"
+                st.session_state["force_cross_menu"] = "選択しない"
                 st.rerun()
         else:
             st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
