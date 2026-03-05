@@ -36,28 +36,27 @@ def init_connection():
 
 supabase = init_connection()
 
-import concurrent.futures
-
-@st.cache_data(ttl=3600, show_spinner="データをSupabaseから高速取得中...")
+@st.cache_data(ttl=3600, show_spinner="データをSupabaseから取得中...")
 def fetch_store_data(store_name):
     all_data = []
-    limit = 1000
+    # 接続切れを防ぐためマルチスレッドは除外し、1回のリクエスト件数を少し増やして往復回数を減らす
+    limit = 2500 
+    offset = 0
     
-    # Supabaseから指定店舗のデータ件数を取得
-    count_resp = supabase.table('slot_data').select('*', count='exact').eq('店舗', store_name).limit(1).execute()
-    total_count = count_resp.count
-    
-    if total_count and total_count > 0:
-        def fetch_chunk(offset):
-            res = supabase.table('slot_data').select('*').eq('店舗', store_name).range(offset, offset + limit - 1).execute()
-            return res.data
-
-        offsets = list(range(0, total_count, limit))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            results = executor.map(fetch_chunk, offsets)
-            for data in results:
-                if data:
-                    all_data.extend(data)
+    while True:
+        try:
+            response = supabase.table('slot_data').select('*').eq('店舗', store_name).range(offset, offset + limit - 1).execute()
+        except Exception as e:
+            # 万が一の通信エラー時はこれまでのデータを返す（空の場合は後続で処理）
+            break
+            
+        data = response.data
+        if not data:
+            break
+        all_data.extend(data)
+        if len(data) < limit:
+            break
+        offset += limit
         
     if not all_data:
         # データがない場合は空のDataFrameを返す（後続のエラー防止）
