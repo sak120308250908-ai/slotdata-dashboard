@@ -26,40 +26,45 @@ components.html(
 
 import requests
 import io
+from supabase import create_client, Client
 
-@st.cache_data(ttl=3600) # 1時間ごとにキャッシュをリセットし最新を取得
-def load_data():
-    # Google Driveの直リンクURL (ファイルID)
-    file_id = '1f4snHPoNaBenKXKvGqQFXKq_7lLRip08'
-    url = "https://docs.google.com/uc?export=download"
+@st.cache_resource
+def init_connection():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_connection()
+
+@st.cache_data(ttl=3600)
+def fetch_store_data(store_name):
+    all_data = []
+    limit = 10000
+    offset = 0
     
-    session = requests.Session()
-    response = session.get(url, params={'id': file_id}, stream=True)
-    
-    token = None
-    for key, value in response.cookies.items():
-        if key.startswith('download_warning'):
-            token = value
+    # Supabaseから指定店舗の全データをページネーションで取得
+    while True:
+        response = supabase.table('slot_data').select('*').eq('店舗', store_name).range(offset, offset + limit - 1).execute()
+        data = response.data
+        if not data:
             break
-            
-    if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(url, params=params, stream=True)
+        all_data.extend(data)
+        if len(data) < limit:
+            break
+        offset += limit
         
-    # BytesIOを使ってメモリ上でCSVを読み込む
-    df = pd.read_csv(io.BytesIO(response.content), low_memory=False)
-    
-    if '機種名（正式名）' in df.columns and '機種名' in df.columns:
-        df['機種名'] = df['機種名（正式名）'].fillna(df['機種名'])
-    elif '機種名（正式名）' in df.columns:
-        df['機種名'] = df['機種名（正式名）']
+    if not all_data:
+        # データがない場合は空のDataFrameを返す（後続のエラー防止）
+        df = pd.DataFrame(columns=['店舗', '日付', '機種名', '台番', 'G数', '差枚', 'BB', 'RB', 'ART', '合成確率'])
+    else:
+        df = pd.DataFrame(all_data)
         
+    # 前処理（既存ロジック）
     df['日付'] = pd.to_datetime(df['日付'])
     df['Month'] = df['日付'].dt.month
     df['Day'] = df['日付'].dt.day
     df['End_Digit'] = df['Day'] % 10
     
-    # 曜日の英語から日本語への変換マッピング
     weekday_map = {
         'Monday': '月曜日', 'Tuesday': '火曜日', 'Wednesday': '水曜日',
         'Thursday': '木曜日', 'Friday': '金曜日', 'Saturday': '土曜日', 'Sunday': '日曜日'
@@ -69,33 +74,29 @@ def load_data():
     weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日']
     df['Weekday'] = pd.Categorical(df['Weekday'], categories=weekdays, ordered=True)
     
+    # 差枚列のクレンジング（文字混入等を考慮）
+    df['差枚'] = pd.to_numeric(df['差枚'], errors='coerce').fillna(0)
     df['Win'] = (df['差枚'] > 0).astype(int)
     return df
-
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"データの読み込みに失敗しました: {e}")
-    st.stop()
 
 # --- サイドバー ---
 st.sidebar.title("🎰 解析メニュー")
 
-# --- 対象店舗の選択 ---
-if '店舗' in df.columns:
-    shops = sorted(df['店舗'].astype(str).unique().tolist())
-    # 以前のデフォルトがキャッスル大金だったので、その名前で先頭に持ってくる
-    if "キャッスル大金" in shops:
-        shops.insert(0, shops.pop(shops.index("キャッスル大金")))
-    elif "castleokane" in shops:
-        shops.insert(0, shops.pop(shops.index("castleokane")))
-        
-    selected_shop = st.sidebar.selectbox("🏠 分析対象の店舗", shops)
-    
-    # 選択した店舗のデータにフィルタリング
-    df = df[df['店舗'] == selected_shop]
-else:
-    selected_shop = "キャッスル大金"
+# 固定の店舗リスト（データベースへの毎回のDistinctクエリ負荷を避けるためハードコード）
+shops = sorted(['プレイランドキャッスル知多にしの台', 'プレイランドキャッスル東郷', 'キング観光サウザンド生桑', 'JP888', 'キング観光尾鷲', 'メガコンコルド大口41号通り', 'プレイランドキャッスル高浜', 'A-FLAG津', 'KYORAKU妙音通', 'プレイランドキャッスル知多東海', 'メガコンコルド名古屋みなと23号通り', 'プレイランドキャッスル天白', 'タイキ豊橋藤沢', 'ラッキー1番日進竹の山', 'リブレ遊援館', 'プレイランドキャッスルワンダー', '玉越中川', 'キング観光サウザンド津', 'キャッスル大金', 'パーラーワールド小牧', 'ZENT岡崎インター', 'ZENT刈谷', 'キング観光サウザンド桑名本店', 'コスモジャパン三谷', 'キング観光サウザンド松阪', 'キング観光サウザンド栄若宮大通', 'メガコンコルド豊川インター', 'がちゃぽん南', 'KEIZ港', 'キクヤ長良', 'ZENT住吉', 'キング観光笠寺', 'キング観光サウザンド栄東新町', 'サンシャインKYORAKU平針', 'プレイランドキャッスル尾頭橋', 'プレイランドキャッスル記念橋南', 'タイキ四日市泊小柳', 'ラッキープラザ弥富', 'ラッキープラザ津島', 'キング観光サウザンド近鉄四日市', 'KYORAKU西', 'メガコンコルド春日井', 'ラッキープラザ可児', 'メガコンコルドみなと木場インター', 'オーギヤタウン半田', 'メガコンコルドBLAZE', 'コスモジャパン大府', 'マルシン777', 'コンコルド愛西日比野駅前', 'ZENT扶桑', 'ZENT各務原', 'キャッスル岩倉', 'キング観光鈴鹿インター', 'プレイランドキャッスル上社', 'サンパレス', 'オーギヤ安城', 'キング観光名張', 'プレイランドキャッスル小牧', 'メガコンコルド刈谷知立', 'プレイランド第一平和', 'キング観光いなべ', 'キング観光サウザンド今池2号', 'コスモジャパン蒲郡', 'ZENT豊橋藤沢店', 'ZENT木曽川', 'メガガイア一宮', 'メガコンコルド稲沢', 'プレイランドキャッスル知多', 'プレイランドキャッスル大垣', 'キング666飛騨高山', 'M&K岡崎', 'MGM四日市', 'ゴー港', 'キクヤ島', 'グランドオータ鳴海', 'ZENT長久手', 'キング観光熊野', 'オータ岡崎', 'KEIZ中川運河', 'メガコンコルド岡崎インター', 'M&K道光寺', 'M&K本店', 'ラッキー1番江南', 'プレイランドキャッスル大曽根', 'ラッキープラザ関', 'A-FLAG瀬戸', 'キクヤ春日井', 'キング666一宮', 'ZENT稲沢', 'キング観光サウザンド桑名サンシパーク', 'メガコンコルド西尾', 'ZENT名古屋北', 'キング観光新瑞', 'キング666半田', 'プレイランドキャッスル春日井', 'プレイランドキャッスル熱田', 'コンコルド岐阜羽島駅前', 'グランワールドカップ本巣', '大丸桜山', 'ZENT市ノ坪', 'コスモジャパン西尾', 'パチンコ立岩', 'ラッキープラザ名古屋西インター七宝', 'ZENT可児', 'メガコンコルド岡崎北', 'キクヤ穂積', 'KYORAKU東海', 'ZENT梅坪', 'ZENT555', 'コンコルド一宮尾西インター', 'G&L一宮', 'ABC豊川', 'メガコンコルド大垣インター南', 'キング666東海', 'ミカド観光半田', 'キング観光サウザンド鈴鹿', 'メガコンコルド豊田インター', 'ZENT豊田本店', 'メガスロットコンコルド吉浜', 'キクヤ本店'])
+
+# キャッスル大金を初期表示にする
+if "キャッスル大金" in shops:
+    shops.insert(0, shops.pop(shops.index("キャッスル大金")))
+
+selected_shop = st.sidebar.selectbox("🏠 分析対象の店舗", shops)
+
+# 選択された店舗のデータのみをSupabaseから取得してDataFrame化
+try:
+    df = fetch_store_data(selected_shop)
+except Exception as e:
+    st.error(f"データの読み込みに失敗しました: {e}")
+    st.stop()
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
