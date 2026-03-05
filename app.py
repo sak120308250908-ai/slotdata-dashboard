@@ -93,16 +93,14 @@ st.sidebar.title("🎰 解析メニュー")
 
 st.sidebar.markdown("### 🌐 全店横断分析モード")
 
+# force_cross_menuが設定されていた場合、ラジオの値を直接上書き（ウィジェット描画前なのでOK）
 if "force_cross_menu" in st.session_state:
-    default_cross_index = ["選択しない", "新台分析", "特定機種分析"].index(st.session_state["force_cross_menu"])
+    st.session_state["cross_menu_radio"] = st.session_state["force_cross_menu"]
     del st.session_state["force_cross_menu"]
-else:
-    default_cross_index = 0
 
 cross_menu = st.sidebar.radio(
     "横断メニューを選択",
     ["選択しない", "新台分析", "特定機種分析"],
-    index=default_cross_index,
     key="cross_menu_radio"
 )
 
