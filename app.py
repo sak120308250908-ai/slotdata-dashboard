@@ -39,8 +39,8 @@ supabase = init_connection()
 @st.cache_data(ttl=3600, show_spinner="データをSupabaseから取得中...")
 def fetch_store_data(store_name):
     all_data = []
-    # 接続切れを防ぐためマルチスレッドは除外し、1回のリクエスト件数を少し増やして往復回数を減らす
-    limit = 2500 
+    # SupabaseのAPI上限が1000件なので、limitは必ず1000にする
+    limit = 1000 
     offset = 0
     
     while True:
