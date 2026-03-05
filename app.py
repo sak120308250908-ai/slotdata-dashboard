@@ -150,7 +150,7 @@ if menu == "1. 全体サマリー＆特定日分析":
     st.markdown("---")
     st.subheader("🔍 特定日の「強い機種」ランキング")
     target_day = st.slider("日付（1〜31）を選択", 1, 31, 6)
-    min_count = st.number_input("最低サンプル数", min_value=1, value=30)
+    min_count = st.number_input("最低サンプル数", min_value=1, value=5)
     
     target_df = df[df['Day'] == target_day]
     machine_stats = target_df.groupby('機種名').agg(
@@ -189,7 +189,7 @@ elif menu == "2. カレンダー・曜日分析":
     st.markdown("---")
     st.subheader("🔍 曜日別の「強い機種」ランキング")
     target_weekday = st.selectbox("分析したい曜日を選択", ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'], index=5)
-    min_count_w = st.number_input("最低サンプル数", min_value=1, value=30, key="min_count_weekday")
+    min_count_w = st.number_input("最低サンプル数", min_value=1, value=5, key="min_count_weekday")
     
     w_df = df[df['Weekday'] == target_weekday]
     w_machine_stats = w_df.groupby('機種名').agg(
