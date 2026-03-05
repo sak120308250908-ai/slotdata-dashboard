@@ -820,3 +820,17 @@ components.html(
     """,
     height=0, width=0,
 )
+
+# 検索エンジンを回避するタグ（headに埋め込み）
+import streamlit.components.v1 as components
+components.html(
+    """
+    <script>
+    var meta = window.parent.document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    window.parent.document.getElementsByTagName('head')[0].appendChild(meta);
+    </script>
+    """,
+    height=0, width=0,
+)
