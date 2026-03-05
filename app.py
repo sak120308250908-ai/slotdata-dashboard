@@ -806,3 +806,17 @@ elif menu == "4. 強力なクロス分析 (曜日×特定日)":
         c_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
         st.dataframe(c_filtered_stats, use_container_width=True)
 
+
+# 検索エンジンを回避するタグ（headに埋め込み）
+import streamlit.components.v1 as components
+components.html(
+    """
+    <script>
+    var meta = window.parent.document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    window.parent.document.getElementsByTagName('head')[0].appendChild(meta);
+    </script>
+    """,
+    height=0, width=0,
+)
