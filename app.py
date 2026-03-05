@@ -135,7 +135,8 @@ selected_shop = st.sidebar.selectbox(
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
-    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索")
+    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索"),
+    on_change=on_shop_change
 )
 
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
