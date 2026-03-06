@@ -86,8 +86,38 @@ def fetch_store_data(store_name):
     
     # 機種名がNoneだとgroupby時にごっそり抜け落ちるため、「不明」で埋める
     df['機種名'] = df['機種名'].fillna('不明')
-    
+
     return df
+
+@st.cache_data(ttl=3600, show_spinner="日程別データを全店舗から取得中...")
+def fetch_machine_cross_data(machine_name):
+    """特定機種の全店舗データをSupabaseから取得（日程絞り込み用）"""
+    all_data = []
+    limit = 1000
+    offset = 0
+    while True:
+        try:
+            response = (supabase.table('slot_data')
+                       .select('店舗,日付,差枚')
+                       .eq('機種名', machine_name)
+                       .range(offset, offset + limit - 1)
+                       .execute())
+        except Exception:
+            break
+        data = response.data
+        if not data:
+            break
+        all_data.extend(data)
+        if len(data) < limit:
+            break
+        offset += limit
+    if not all_data:
+        return pd.DataFrame(columns=['店舗', '日付', '差枚', 'Win'])
+    mdf = pd.DataFrame(all_data)
+    mdf['日付'] = pd.to_datetime(mdf['日付'])
+    mdf['差枚'] = pd.to_numeric(mdf['差枚'], errors='coerce')
+    mdf['Win'] = (mdf['差枚'] > 0).astype(int)
+    return mdf
 
 # --- サイドバー ---
 st.sidebar.title("🎰 解析メニュー")
@@ -194,10 +224,10 @@ if cross_menu != "選択しない":
         cross_machine_file = "cross_machine_stats.csv"
         if os.path.exists(cross_machine_file):
             cross_m_df = pd.read_csv(cross_machine_file)
-            cross_m_df.columns = ['店名', '機種名', '総導入台数', '稼働日数', '平均差枚数', '勝率', '集計数']
+            cross_m_df.columns = ['店名', '機種名', '総導入台数_旧', '稼働日数', '平均差枚数', '勝率', '集計数']
 
-            # 機種リストを総設置数（全店合計）が多い順にソート
-            machine_totals = cross_m_df.groupby('機種名')['総導入台数'].sum().sort_values(ascending=False)
+            # 機種リストを集計数（全店合計）が多い順にソート
+            machine_totals = cross_m_df.groupby('機種名')['集計数'].sum().sort_values(ascending=False)
             machine_list = machine_totals.index.tolist()
 
             # ── 検索窓 ──
@@ -248,38 +278,67 @@ if cross_menu != "選択しない":
                 on_change=on_cross_machine_select,
             )
 
-            display_df = cross_m_df[cross_m_df['機種名'] == selected_machine].copy()
-            display_df = display_df.sort_values("平均差枚数", ascending=False)
-            display_df.drop("機種名", axis=1, inplace=True)
+            # ── 日程を絞り込む ──
+            day_options = ["全日程", "0のつく日", "1のつく日", "2のつく日", "3のつく日", "4のつく日",
+                           "5のつく日", "6のつく日", "7のつく日", "8のつく日", "9のつく日"]
+            day_filter = st.radio("📅 日程を絞り込む", day_options, horizontal=True,
+                                  key="cross_machine_day_filter", index=0)
 
-            # 勝率を「XX.X%(プラス台数/集計数)」形式に変換
-            plus_count = (display_df['勝率'] * display_df['集計数']).round().astype(int)
-            total_count = display_df['集計数'].astype(int)
-            pct = (display_df['勝率'] * 100).round(1)
-            display_df['勝率'] = pct.astype(str) + "%(" + plus_count.astype(str) + "/" + total_count.astype(str) + ")"
-            display_df['平均差枚数'] = display_df['平均差枚数'].round().astype(int)
-            display_df['稼働日数'] = display_df['稼働日数'].astype(int)
+            # ── 共通ヘルパー: 表示用DataFrameを作成 ──
+            def build_machine_display_df(df_in, shop_col):
+                d = df_in.copy()
+                d['1日あたりの稼働台数'] = (d['集計数'] / d['稼働日数']).round(1)
+                plus_count = (d['勝率'] * d['集計数']).round().astype(int)
+                total_count = d['集計数'].astype(int)
+                pct = (d['勝率'] * 100).round(1)
+                d['勝率'] = pct.astype(str) + "%(" + plus_count.astype(str) + "/" + total_count.astype(str) + ")"
+                d.rename(columns={'集計数': '総導入台数'}, inplace=True)
+                d['平均差枚数'] = d['平均差枚数'].round().astype(int)
+                d['稼働日数'] = d['稼働日数'].astype(int)
+                return d[[shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '勝率']].rename(columns={shop_col: '店名'})
 
-            # 表示列の順序
-            display_df = display_df[['店名', '稼働日数', '総導入台数', '平均差枚数', '勝率']]
+            display_df = None
+            if day_filter == "全日程":
+                raw = cross_m_df[cross_m_df['機種名'] == selected_machine].copy()
+                raw = raw.sort_values("平均差枚数", ascending=False)
+                raw.drop(columns=['機種名', '総導入台数_旧'], inplace=True)
+                display_df = build_machine_display_df(raw, '店名')
+            else:
+                digit = day_filter[0]
+                machine_raw = fetch_machine_cross_data(selected_machine)
+                if len(machine_raw) == 0:
+                    st.warning("データが取得できませんでした。")
+                else:
+                    filtered = machine_raw[machine_raw['日付'].dt.day.astype(str).str.contains(digit)].copy()
+                    if len(filtered) == 0:
+                        st.info(f"「{day_filter}」に該当するデータが見つかりませんでした。")
+                    else:
+                        stats = filtered.groupby('店舗').agg(
+                            稼働日数=('日付', 'nunique'),
+                            集計数=('差枚', 'count'),
+                            平均差枚数=('差枚', 'mean'),
+                            勝率=('Win', 'mean')
+                        ).reset_index()
+                        stats = stats[stats['集計数'] >= 3]
+                        stats = stats.sort_values("平均差枚数", ascending=False)
+                        display_df = build_machine_display_df(stats, '店舗')
 
-            event = st.dataframe(
-                display_df,
-                use_container_width=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                hide_index=True,
-                key=f"cross_machine_df_table_{st.session_state.get('df_key_suffix', 0)}"
-            )
-            if len(event.selection.rows) > 0:
-                clicked_shop = display_df.iloc[event.selection.rows[0]]['店名']
-                st.session_state["go_to_shop"] = clicked_shop
-                st.session_state["force_cross_menu"] = "選択しない"
-                st.session_state["df_key_suffix"] = st.session_state.get("df_key_suffix", 0) + 1
-                st.rerun()
-
-            st.caption("💡 店名、総導入台数などのヘッダーに触れると並び替えができます")
-            st.caption("※ 総導入台数はデータ期間内にこの機種が設置されたユニークな台番数です（現在の設置台数とは異なる場合があります）")
+            if display_df is not None:
+                event = st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    hide_index=True,
+                    key=f"cross_machine_df_table_{st.session_state.get('df_key_suffix', 0)}"
+                )
+                if len(event.selection.rows) > 0:
+                    clicked_shop = display_df.iloc[event.selection.rows[0]]['店名']
+                    st.session_state["go_to_shop"] = clicked_shop
+                    st.session_state["force_cross_menu"] = "選択しない"
+                    st.session_state["df_key_suffix"] = st.session_state.get("df_key_suffix", 0) + 1
+                    st.rerun()
+                st.caption("💡 店名、稼働日数などのヘッダーに触れると並び替えができます")
         else:
             st.warning("横断分析データがまだ準備中です。数分後に再度お試しください。")
             
