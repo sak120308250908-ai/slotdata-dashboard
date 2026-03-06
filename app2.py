@@ -4,7 +4,117 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Slot Data Dashboard", page_icon="🎰", layout="wide")
+st.set_page_config(page_title="スロット分析 Pro", page_icon="📊", layout="wide")
+
+# ── ビジネス・プロ風カスタムテーマ ──────────────────────────────
+st.markdown("""
+<style>
+/* === メインエリア === */
+.stApp {
+    background-color: #f0f2f5;
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+                 'Noto Sans JP', 'Yu Gothic', sans-serif;
+}
+.block-container { padding-top: 1.4rem; padding-bottom: 1rem; }
+
+/* === サイドバー === */
+[data-testid="stSidebar"] {
+    background-color: #1a2744 !important;
+}
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] div,
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] h3 {
+    color: #dce6f4 !important;
+}
+[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.15); }
+[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label span {
+    color: #dce6f4 !important;
+}
+
+/* === 見出し === */
+h1 {
+    color: #1a2744 !important;
+    border-bottom: 3px solid #e67e22;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
+h2 {
+    color: #1a2744 !important;
+    border-left: 4px solid #e67e22;
+    padding-left: 10px;
+    margin-top: 20px;
+}
+h3 { color: #2c3e6b !important; }
+
+/* === メトリクスカード === */
+[data-testid="metric-container"] {
+    background-color: #ffffff;
+    border: 1px solid #dde3ed;
+    border-left: 4px solid #e67e22;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+[data-testid="stMetricLabel"] { color: #6b7a99 !important; font-size: 0.82rem; }
+[data-testid="stMetricValue"] { color: #1a2744 !important; font-weight: 700; }
+[data-testid="stMetricDelta"] { font-size: 0.8rem; }
+
+/* === ボタン === */
+.stButton > button {
+    background-color: #1a2744 !important;
+    color: #ffffff !important;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: background-color 0.18s;
+    padding: 6px 18px;
+}
+.stButton > button:hover {
+    background-color: #e67e22 !important;
+    color: #ffffff !important;
+}
+
+/* === テーブル・データフレーム === */
+.stDataFrame {
+    background-color: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+
+/* === テキスト入力・スライダー === */
+.stTextInput > div > input,
+.stNumberInput > div > input {
+    border: 1px solid #c8d0df;
+    border-radius: 6px;
+    background-color: #ffffff;
+}
+.stSlider [data-baseweb="slider"] div[role="slider"] {
+    background-color: #e67e22 !important;
+}
+
+/* === 水平区切り === */
+hr { border-color: #d0d8e4; margin: 1.2rem 0; }
+
+/* === expander === */
+.streamlit-expanderHeader {
+    background-color: #edf1f7;
+    border-radius: 6px;
+    color: #1a2744 !important;
+    font-weight: 600;
+}
+
+/* === success / info / warning === */
+.stAlert { border-radius: 8px; }
+
+/* === トップヘッダー非表示（Streamlit のハンバーガーメニュー上部スペース） === */
+header[data-testid="stHeader"] { background-color: #f0f2f5; }
+</style>
+""", unsafe_allow_html=True)
 
 # Chromeなどの自動翻訳によるDOM破壊（Reactエラー）を防ぐため、HTMLタグを強制的に日本語指定する
 components.html(
@@ -90,7 +200,7 @@ def fetch_store_data(store_name):
     return df
 
 # --- サイドバー ---
-st.sidebar.title("🎰 解析メニュー")
+st.sidebar.title("📊 分析メニュー Pro")
 
 st.sidebar.markdown("### 🌐 全店横断分析モード")
 
@@ -158,7 +268,7 @@ st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True
 # -----------------
 import os
 if cross_menu != "選択しない":
-    st.title("🌐 全店横断分析ランキング")
+    st.title("🌐 全店横断分析ランキング Pro")
     st.write("各店舗の傾向を横断比較します。**👇 下記テーブルの「店名」行をクリックすると、その店舗の詳細分析ページへジャンプします！**")
     
     if cross_menu == "新台分析":
@@ -298,7 +408,7 @@ except Exception as e:
     st.error(f"データの読み込みに失敗しました: {e}")
     st.stop()
 
-st.title("🎰 スロットデータ店舗分析ダッシュボード")
+st.title("📊 スロットデータ店舗分析 Pro")
 st.markdown(f"**対象店舗**: {effective_shop}")
 if len(df) > 0:
     st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
@@ -320,7 +430,8 @@ if menu == "1. 全体サマリー＆特定日分析":
         
         fig = px.bar(end_digit_stats, x='End_Digit', y='Avg_Samaisu',
                      title="末尾別の平均差枚数",
-                     color='Avg_Samaisu', color_continuous_scale='RdYlGn',
+                     color='Avg_Samaisu', color_continuous_scale='RdBu',
+                     template='plotly_white',
                      labels={'Avg_Samaisu': '平均差枚数', 'End_Digit': '日付の末尾'})
         fig.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig, use_container_width=True)
@@ -368,12 +479,15 @@ elif menu == "2. カレンダー・曜日分析":
     with col1:
         fig1 = px.bar(weekday_stats, x='Weekday', y='Avg_Samaisu',
                       title="曜日別の平均差枚数",
-                      color='Avg_Samaisu', color_continuous_scale='RdYlGn')
+                      color='Avg_Samaisu', color_continuous_scale='RdBu',
+                      template='plotly_white')
         fig1.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig1, use_container_width=True)
     with col2:
-        fig2 = px.line(weekday_stats, x='Weekday', y='Win_Rate', 
-                       title="曜日別の勝率", markers=True)
+        fig2 = px.line(weekday_stats, x='Weekday', y='Win_Rate',
+                       title="曜日別の勝率", markers=True,
+                       color_discrete_sequence=['#e67e22'],
+                       template='plotly_white')
         fig2.update_layout(yaxis=dict(tickformat=".0%"))
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -438,20 +552,24 @@ elif menu == "3. 機種別詳細分析":
         st.write("▼ 特定日の傾向（末尾別の平均差枚）")
         e_stats = m_df.groupby('End_Digit')['差枚'].mean().reset_index()
         e_stats['End_Digit'] = e_stats['End_Digit'].astype(str) + "の付く日"
-        fig_e = px.bar(e_stats, x='End_Digit', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
+        fig_e = px.bar(e_stats, x='End_Digit', y='差枚', color='差枚',
+                       color_continuous_scale='RdBu', template='plotly_white')
         fig_e.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig_e, use_container_width=True)
 
     with col2:
         st.write("▼ 曜日別の平均差枚")
         w_stats = m_df.groupby('Weekday')['差枚'].mean().reset_index()
-        fig_w = px.bar(w_stats, x='Weekday', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
+        fig_w = px.bar(w_stats, x='Weekday', y='差枚', color='差枚',
+                       color_continuous_scale='RdBu', template='plotly_white')
         fig_w.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig_w, use_container_width=True)
-        
+
     with col3:
         st.write("▼ 差枚数の分布（ヒストグラム）")
-        fig_hist = px.histogram(m_df, x='差枚', nbins=50)
+        fig_hist = px.histogram(m_df, x='差枚', nbins=50,
+                                color_discrete_sequence=['#1a2744'],
+                                template='plotly_white')
         st.plotly_chart(fig_hist, use_container_width=True)
 
 # --- 5. 新台の初日・強弱分析 ---
