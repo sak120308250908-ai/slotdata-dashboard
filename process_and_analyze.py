@@ -35,8 +35,9 @@ for f in files:
     # Unicode正規化（全角英数字を半角に、濁点を結合）して小文字化、前後の空白削除
     normalized_name = unicodedata.normalize('NFKC', raw_store_name).strip().lower()
     
-    # 辞書に一致すれば日本語に、一致しなければ正規化後の名前を使用
-    store_name = shop_name_mapping.get(normalized_name, raw_store_name)
+    # 辞書に一致すれば日本語に、一致しなければNFKC正規化後の名前を使用（decomposed Unicodeを防ぐ）
+    nfkc_store_name = unicodedata.normalize('NFKC', raw_store_name).strip()
+    store_name = shop_name_mapping.get(normalized_name, nfkc_store_name)
     
     # さらに、もし「プレイランドキャッスル高浜」が含まれていたら強制統一
     if "プレイランドキャッスル高浜" in normalized_name or "playland" in normalized_name:
@@ -47,7 +48,6 @@ for f in files:
     df = pd.read_excel(f)
     df['店舗'] = store_name
     
-    # 日付列がない場合（1日分のデータ等）、ファイル名の先頭（YYYYMMDD）から日付を自動生成
     if '日付' not in df.columns:
         date_str = parts[0] # 例: '20260303'
         try:
@@ -56,6 +56,14 @@ for f in files:
         except Exception as e:
             print(f"  [Warn] Failed to parse date from filename '{date_str}': {e}")
             
+    # 機種名のカラム名揺れを吸収する
+    possible_machine_cols = ['機種名（正式名）', '機種名（データサイト 表記）', '機種', '台名称']
+    if '機種名' not in df.columns:
+        for col in possible_machine_cols:
+            if col in df.columns:
+                df.rename(columns={col: '機種名'}, inplace=True)
+                break
+                
     print(f'Reading {filename} - {len(df)} rows, Shop: {store_name} (from: {raw_store_name})')
     df_list.append(df)
 

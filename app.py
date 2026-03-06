@@ -401,7 +401,10 @@ elif menu == "5. 新台の初日・強弱分析":
         with st.spinner("新台のデータを抽出中..."):
             min_date = df['日付'].min()
             first_appearance = df.groupby('機種名')['日付'].min().reset_index()
-            new_machines_df = first_appearance[first_appearance['日付'] > min_date]
+            new_machines_df = first_appearance[
+                (first_appearance['日付'] > min_date) &
+                (first_appearance['機種名'] != '不明')  # 機種名不明は除外
+            ]
             new_machines = new_machines_df['機種名'].tolist()
             
             if not new_machines:
