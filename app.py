@@ -129,10 +129,16 @@ if "force_cross_menu" in st.session_state:
     st.session_state["cross_menu_radio"] = st.session_state["force_cross_menu"]
     del st.session_state["force_cross_menu"]
 
+def on_cross_menu_change():
+    """横断メニュー変更時: 横断モードに入ったら店舗メニューを「選択しない」にリセット"""
+    if st.session_state.get("cross_menu_radio", "選択しない") != "選択しない":
+        st.session_state["force_menu"] = "選択しない"
+
 cross_menu = st.sidebar.radio(
     "横断メニューを選択",
     ["選択しない", "新台分析", "特定機種分析"],
-    key="cross_menu_radio"
+    key="cross_menu_radio",
+    on_change=on_cross_menu_change
 )
 
 st.sidebar.markdown("---")
@@ -176,7 +182,7 @@ if "force_menu" in st.session_state:
 
 menu = st.sidebar.radio(
     "分析モードを選択してください",
-    ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索"),
+    ("選択しない", "1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索"),
     key="menu_radio",
     on_change=on_menu_change
 )
@@ -279,10 +285,30 @@ if cross_menu != "選択しない":
             )
 
             # ── 日程を絞り込む ──
-            day_options = ["全日程", "0のつく日", "1のつく日", "2のつく日", "3のつく日", "4のつく日",
-                           "5のつく日", "6のつく日", "7のつく日", "8のつく日", "9のつく日"]
-            day_filter = st.radio("📅 日程を絞り込む", day_options, horizontal=True,
-                                  key="cross_machine_day_filter", index=0)
+            filter_type = st.radio(
+                "📅 日程を絞り込む",
+                ["全日程", "末尾の数字で絞り込む", "特定の日付を指定する", "曜日を指定する"],
+                horizontal=True, key="cross_machine_filter_type", index=0
+            )
+
+            if filter_type == "末尾の数字で絞り込む":
+                digit_sel = st.radio(
+                    "末尾の数字を選択",
+                    ["0のつく日", "1のつく日", "2のつく日", "3のつく日", "4のつく日",
+                     "5のつく日", "6のつく日", "7のつく日", "8のつく日", "9のつく日"],
+                    horizontal=True, key="cross_machine_digit_sel"
+                )
+            elif filter_type == "特定の日付を指定する":
+                day_sel = st.selectbox(
+                    "日付を選択", [f"{d}日" for d in range(1, 32)],
+                    key="cross_machine_day_sel"
+                )
+            elif filter_type == "曜日を指定する":
+                weekday_sel = st.radio(
+                    "曜日を選択",
+                    ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"],
+                    horizontal=True, key="cross_machine_weekday_sel"
+                )
 
             # ── 共通ヘルパー: 表示用DataFrameを作成 ──
             def build_machine_display_df(df_in, shop_col):
@@ -298,20 +324,29 @@ if cross_menu != "選択しない":
                 return d[[shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '勝率']].rename(columns={shop_col: '店名'})
 
             display_df = None
-            if day_filter == "全日程":
+            if filter_type == "全日程":
                 raw = cross_m_df[cross_m_df['機種名'] == selected_machine].copy()
                 raw = raw.sort_values("平均差枚数", ascending=False)
                 raw.drop(columns=['機種名', '総導入台数_旧'], inplace=True)
                 display_df = build_machine_display_df(raw, '店名')
             else:
-                digit = day_filter[0]
                 machine_raw = fetch_machine_cross_data(selected_machine)
                 if len(machine_raw) == 0:
                     st.warning("データが取得できませんでした。")
                 else:
-                    filtered = machine_raw[machine_raw['日付'].dt.day.astype(str).str.contains(digit)].copy()
+                    if filter_type == "末尾の数字で絞り込む":
+                        filtered = machine_raw[machine_raw['日付'].dt.day.astype(str).str.contains(digit_sel[0])].copy()
+                        filter_label = digit_sel
+                    elif filter_type == "特定の日付を指定する":
+                        day_num = int(day_sel.replace("日", ""))
+                        filtered = machine_raw[machine_raw['日付'].dt.day == day_num].copy()
+                        filter_label = day_sel
+                    else:  # 曜日を指定する
+                        _wmap = {'日曜日': 6, '月曜日': 0, '火曜日': 1, '水曜日': 2, '木曜日': 3, '金曜日': 4, '土曜日': 5}
+                        filtered = machine_raw[machine_raw['日付'].dt.weekday == _wmap[weekday_sel]].copy()
+                        filter_label = weekday_sel
                     if len(filtered) == 0:
-                        st.info(f"「{day_filter}」に該当するデータが見つかりませんでした。")
+                        st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
                     else:
                         stats = filtered.groupby('店舗').agg(
                             稼働日数=('日付', 'nunique'),
@@ -347,6 +382,11 @@ if cross_menu != "選択しない":
 # -----------------
 # 以下は従来の店舗個別モード
 # -----------------
+if menu == "選択しない":
+    st.title("🎰 スロットデータ店舗分析ダッシュボード")
+    st.info("👈 左のサイドバーの「🏠 店舗個別分析モード」から分析モードを選択してください")
+    st.stop()
+
 # nav_target_shopがある場合はそちらを優先（ランキングからのジャンプ時）
 # ユーザーが手動でselectboxを変更するとon_shop_changeでnav_target_shopが消えてselected_shopに戻る
 effective_shop = st.session_state.get("nav_target_shop", selected_shop)
@@ -397,21 +437,35 @@ if menu == "1. 全体サマリー＆特定日分析":
 
     st.markdown("---")
     st.subheader("🔍 特定日の「強い機種」ランキング")
-    target_day = st.slider("日付（1〜31）を選択", 1, 31, 6)
-    min_count_str = st.radio("最低サンプル数の絞り込み", ["5以上", "10以上", "20以上"], horizontal=True)
+    day_rank_filter_type = st.radio(
+        "絞り込みの方法",
+        ["日付を指定（1〜31日）", "末尾の数字で絞り込む（0〜9のつく日）"],
+        horizontal=True, key="day_ranking_filter_type"
+    )
+    if day_rank_filter_type == "日付を指定（1〜31日）":
+        target_day = st.slider("日付（1〜31）を選択", 1, 31, 6)
+        target_df = df[df['Day'] == target_day]
+        rank_label = f"毎月 **{target_day}日**"
+    else:
+        end_digit_opts = ["0のつく日", "1のつく日", "2のつく日", "3のつく日", "4のつく日",
+                          "5のつく日", "6のつく日", "7のつく日", "8のつく日", "9のつく日"]
+        sel_digit = st.radio("末尾の数字を選択", end_digit_opts, horizontal=True, key="end_digit_rank_radio")
+        target_df = df[df['Day'].astype(str).str.contains(sel_digit[0])]
+        rank_label = f"**{sel_digit}**"
+
+    min_count_str = st.radio("最低サンプル数", ["5以上", "10以上", "20以上"], horizontal=True, key="min_count_day_radio")
     min_count = int(min_count_str.replace("以上", ""))
-    
-    target_df = df[df['Day'] == target_day]
+
     machine_stats = target_df.groupby('機種名').agg(
         Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
     ).reset_index()
-    
+
     filtered_stats = machine_stats[machine_stats['Count'] >= min_count].sort_values('Avg_Samaisu', ascending=False).head(15)
     filtered_stats['Win_Rate'] = (filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
     filtered_stats['Avg_Samaisu'] = filtered_stats['Avg_Samaisu'].round().astype(int)
     filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
-    
-    st.write(f"毎月 **{target_day}日** の優良機種トップ15 (サンプル数{min_count}以上)")
+
+    st.write(f"{rank_label} の優良機種トップ15 (サンプル数{min_count}以上)")
     st.dataframe(filtered_stats, use_container_width=True, hide_index=True)
 
 
