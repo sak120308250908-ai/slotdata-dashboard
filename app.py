@@ -79,8 +79,9 @@ def fetch_store_data(store_name):
     weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日']
     df['Weekday'] = pd.Categorical(df['Weekday'], categories=weekdays, ordered=True)
     
-    # 差枚列のクレンジング（文字混入等を考慮）
+    # 数値列のクレンジング
     df['差枚'] = pd.to_numeric(df['差枚'], errors='coerce').fillna(0)
+    df['G数'] = pd.to_numeric(df['G数'], errors='coerce').fillna(0)
     df['Win'] = (df['差枚'] > 0).astype(int)
     
     # 機種名がNoneだとgroupby時にごっそり抜け落ちるため、「不明」で埋める
