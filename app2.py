@@ -34,7 +34,24 @@ st.markdown("""
     color: #dce6f4 !important;
 }
 
-/* === 見出し === */
+/* === サイドバー見出し（白に上書き） === */
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #ffffff !important;
+    border: none !important;
+    padding: 0 !important;
+    margin-bottom: 8px !important;
+}
+
+/* === サイドバーのプルダウン文字色（白背景内は濃色） === */
+[data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] [data-baseweb="select"] span,
+[data-testid="stSidebar"] [data-baseweb="select"] div {
+    color: #1a2744 !important;
+}
+
+/* === メインエリア見出し === */
 h1 {
     color: #1a2744 !important;
     border-bottom: 3px solid #e67e22;
