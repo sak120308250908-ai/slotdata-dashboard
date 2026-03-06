@@ -131,9 +131,15 @@ selected_shop = st.sidebar.selectbox(
     on_change=on_shop_change
 )
 
+# force_menuが設定されていた場合、ラジオの値を直接上書き（ウィジェット描画前なのでOK）
+if "force_menu" in st.session_state:
+    st.session_state["menu_radio"] = st.session_state["force_menu"]
+    del st.session_state["force_menu"]
+
 menu = st.sidebar.radio(
     "分析モードを選択してください",
     ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索"),
+    key="menu_radio",
     on_change=on_shop_change
 )
 
@@ -168,6 +174,7 @@ if cross_menu != "選択しない":
                 clicked_shop = cross_new_df.iloc[event.selection.rows[0]]['店名']
                 st.session_state["go_to_shop"] = clicked_shop
                 st.session_state["force_cross_menu"] = "選択しない"
+                st.session_state["force_menu"] = "5. 新台の初日・強弱分析"
                 # Force a new data frame to render next time to clear selection
                 st.session_state["df_key_suffix"] = st.session_state.get("df_key_suffix", 0) + 1
                 st.rerun()
