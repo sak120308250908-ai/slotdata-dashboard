@@ -108,27 +108,34 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### 🏠 店舗個別分析モード")
 
 def on_shop_change():
+    """店舗selectbox変更時: cross_menuリセット＋ナビゲーション先をリセット"""
+    st.session_state["force_cross_menu"] = "選択しない"
+    st.session_state.pop("nav_target_shop", None)
+
+def on_menu_change():
+    """メニューradio変更時: cross_menuリセットのみ（nav_target_shopは消さない）"""
     st.session_state["force_cross_menu"] = "選択しない"
 
 # 固定の店舗リスト（データベースへの毎回のDistinctクエリ負荷を避けるためハードコード）
 shops = sorted(['プレイランドキャッスル知多にしの台', 'プレイランドキャッスル東郷', 'キング観光サウザンド生桑', 'JP888', 'キング観光尾鷲', 'メガコンコルド大口41号通り', 'プレイランドキャッスル高浜', 'A-FLAG津', 'KYORAKU妙音通', 'プレイランドキャッスル知多東海', 'メガコンコルド名古屋みなと23号通り', 'プレイランドキャッスル天白', 'タイキ豊橋藤沢', 'ラッキー1番日進竹の山', 'リブレ遊援館', 'プレイランドキャッスルワンダー', '玉越中川', 'キング観光サウザンド津', 'キャッスル大金', 'パーラーワールド小牧', 'ZENT岡崎インター', 'ZENT刈谷', 'キング観光サウザンド桑名本店', 'コスモジャパン三谷', 'キング観光サウザンド松阪', 'キング観光サウザンド栄若宮大通', 'メガコンコルド豊川インター', 'がちゃぽん南', 'KEIZ港', 'キクヤ長良', 'ZENT住吉', 'キング観光笠寺', 'キング観光サウザンド栄東新町', 'サンシャインKYORAKU平針', 'プレイランドキャッスル尾頭橋', 'プレイランドキャッスル記念橋南', 'タイキ四日市泊小柳', 'ラッキープラザ弥富', 'ラッキープラザ津島', 'キング観光サウザンド近鉄四日市', 'KYORAKU西', 'メガコンコルド春日井', 'ラッキープラザ可児', 'メガコンコルドみなと木場インター', 'オーギヤタウン半田', 'メガコンコルドBLAZE', 'コスモジャパン大府', 'マルシン777', 'コンコルド愛西日比野駅前', 'ZENT扶桑', 'ZENT各務原', 'キャッスル岩倉', 'キング観光鈴鹿インター', 'プレイランドキャッスル上社', 'サンパレス', 'オーギヤ安城', 'キング観光名張', 'プレイランドキャッスル小牧', 'メガコンコルド刈谷知立', 'プレイランド第一平和', 'キング観光いなべ', 'キング観光サウザンド今池2号', 'コスモジャパン蒲郡', 'ZENT豊橋藤沢店', 'ZENT木曽川', 'メガガイア一宮', 'メガコンコルド稲沢', 'プレイランドキャッスル知多', 'プレイランドキャッスル大垣', 'キング666飛騨高山', 'M&K岡崎', 'MGM四日市', 'ゴー港', 'キクヤ島', 'グランドオータ鳴海', 'ZENT長久手', 'キング観光熊野', 'オータ岡崎', 'KEIZ中川運河', 'メガコンコルド岡崎インター', 'M&K道光寺', 'M&K本店', 'ラッキー1番江南', 'プレイランドキャッスル大曽根', 'ラッキープラザ関', 'A-FLAG瀬戸', 'キクヤ春日井', 'キング666一宮', 'ZENT稲沢', 'キング観光サウザンド桑名サンシパーク', 'メガコンコルド西尾', 'ZENT名古屋北', 'キング観光新瑞', 'キング666半田', 'プレイランドキャッスル春日井', 'プレイランドキャッスル熱田', 'コンコルド岐阜羽島駅前', 'グランワールドカップ本巣', '大丸桜山', 'ZENT市ノ坪', 'コスモジャパン西尾', 'パチンコ立岩', 'ラッキープラザ名古屋西インター七宝', 'ZENT可児', 'メガコンコルド岡崎北', 'キクヤ穂積', 'KYORAKU東海', 'ZENT梅坪', 'ZENT555', 'コンコルド一宮尾西インター', 'G&L一宮', 'ABC豊川', 'メガコンコルド大垣インター南', 'キング666東海', 'ミカド観光半田', 'キング観光サウザンド鈴鹿', 'メガコンコルド豊田インター', 'ZENT豊田本店', 'メガスロットコンコルド吉浜', 'キクヤ本店'])
 
 # 選択された店舗の管理 (クロス分析からのジャンプ対応)
+# selectboxのwidgetキー書き換えが不安定なため、nav_target_shopという独立したキーで
+# ジャンプ先店舗を管理し、データ取得はそちらから直接読む
 if "go_to_shop" in st.session_state:
-    default_shop = st.session_state["go_to_shop"]
-    if default_shop in shops:
-        default_index = shops.index(default_shop)
-    else:
-        default_index = shops.index("キャッスル大金") if "キャッスル大金" in shops else 0
+    target_shop = st.session_state["go_to_shop"]
     del st.session_state["go_to_shop"]
-else:
-    default_index = shops.index("キャッスル大金") if "キャッスル大金" in shops else 0
+    st.session_state["nav_target_shop"] = target_shop  # データ取得用（確実に効く）
+    if target_shop in shops:
+        st.session_state["selected_shop_widget"] = target_shop  # 表示用（ベストエフォート）
+    st.rerun()
 
 selected_shop = st.sidebar.selectbox(
-    "🏠 分析対象の店舗", 
-    shops, 
-    index=default_index,
-    on_change=on_shop_change
+    "🏠 分析対象の店舗",
+    shops,
+    index=shops.index("キャッスル大金") if "キャッスル大金" in shops else 0,
+    on_change=on_shop_change,
+    key="selected_shop_widget"
 )
 
 # force_menuが設定されていた場合、ラジオの値を直接上書き（ウィジェット描画前なのでOK）
@@ -140,7 +147,7 @@ menu = st.sidebar.radio(
     "分析モードを選択してください",
     ("1. 全体サマリー＆特定日分析", "2. カレンダー・曜日分析", "3. 機種別詳細分析", "4. 強力なクロス分析 (曜日×特定日)", "5. 新台の初日・強弱分析", "6. AI・チャット風検索"),
     key="menu_radio",
-    on_change=on_shop_change
+    on_change=on_menu_change
 )
 
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
@@ -222,14 +229,18 @@ if cross_menu != "選択しない":
 # -----------------
 # 以下は従来の店舗個別モード
 # -----------------
+# nav_target_shopがある場合はそちらを優先（ランキングからのジャンプ時）
+# ユーザーが手動でselectboxを変更するとon_shop_changeでnav_target_shopが消えてselected_shopに戻る
+effective_shop = st.session_state.get("nav_target_shop", selected_shop)
+
 try:
-    df = fetch_store_data(selected_shop)
+    df = fetch_store_data(effective_shop)
 except Exception as e:
     st.error(f"データの読み込みに失敗しました: {e}")
     st.stop()
 
 st.title("🎰 スロットデータ店舗分析ダッシュボード")
-st.markdown(f"**対象店舗**: {selected_shop}")
+st.markdown(f"**対象店舗**: {effective_shop}")
 if len(df) > 0:
     st.markdown(f"**データ件数**: {len(df):,}件 (期間: {df['日付'].min().strftime('%Y-%m-%d')} 〜 {df['日付'].max().strftime('%Y-%m-%d')})")
 else:
