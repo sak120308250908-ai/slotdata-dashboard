@@ -69,6 +69,28 @@ for f in files:
 
 combined_df = pd.concat(df_list, ignore_index=True)
 
+# 異常データの除外（バグのある日付・店舗の組み合わせ）
+BAD_DATA_FILTER = [
+    ('プレイランドキャッスル大曽根', '2025-12-26'),
+]
+combined_df['日付'] = pd.to_datetime(combined_df['日付'])
+for store, date in BAD_DATA_FILTER:
+    mask = (combined_df['店舗'] == store) & (combined_df['日付'] == pd.Timestamp(date))
+    n = mask.sum()
+    if n > 0:
+        print(f"[BAD DATA] {store} {date} を除外: {n}行")
+    combined_df = combined_df[~mask]
+
+BAD_ROW_FILTER = [
+    ('メガコンコルド岡崎北', '2026-01-15', '800'),  # 差枚1664万枚の異常値
+]
+for store, date, daiban in BAD_ROW_FILTER:
+    mask = (combined_df['店舗'] == store) & (combined_df['日付'] == pd.Timestamp(date)) & (combined_df['台番'].astype(str) == str(daiban))
+    n = mask.sum()
+    if n > 0:
+        print(f"[BAD ROW] {store} {date} 台番{daiban} を除外: {n}行")
+    combined_df = combined_df[~mask]
+
 # 重複排除: 店舗、日付、台番が完全に一致するデータが複数ある場合は、古いものを消して1つにする
 before_dedup = len(combined_df)
 # '日付'列がdatetime型でない場合は変換（念のため）

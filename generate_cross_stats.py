@@ -11,6 +11,28 @@ df['G数'] = pd.to_numeric(df['G数'], errors='coerce').fillna(0)
 df['Win'] = (df['差枚'] > 0).astype(int)
 df['機種名'] = df['機種名'].fillna('不明')
 
+# 異常データの除外（店舗+日付）
+BAD_DATA_FILTER = [
+    ('プレイランドキャッスル大曽根', '2025-12-26'),
+]
+for store, date in BAD_DATA_FILTER:
+    mask = (df['店舗'] == store) & (df['日付'] == pd.Timestamp(date))
+    n = mask.sum()
+    if n > 0:
+        print(f"[BAD DATA] {store} {date} を除外: {n}行")
+    df = df[~mask]
+
+# 異常データの除外（店舗+日付+台番）
+BAD_ROW_FILTER = [
+    ('メガコンコルド岡崎北', '2026-01-15', '800'),  # 差枚1664万枚の異常値
+]
+for store, date, daiban in BAD_ROW_FILTER:
+    mask = (df['店舗'] == store) & (df['日付'] == pd.Timestamp(date)) & (df['台番'].astype(str) == str(daiban))
+    n = mask.sum()
+    if n > 0:
+        print(f"[BAD ROW] {store} {date} 台番{daiban} を除外: {n}行")
+    df = df[~mask]
+
 # 1. 特定機種分析 (Cross Machine Stats)
 print("Computing cross_machine_stats...")
 machine_stats = df.groupby(['店舗', '機種名']).agg(
