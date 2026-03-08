@@ -519,16 +519,17 @@ elif menu == "3. 機種別詳細分析":
     # 選択できる機種名（全体で100件以上のデータがあるものに絞る）
     machine_counts = df['機種名'].value_counts()
     valid_machines = machine_counts[machine_counts >= 100].index.tolist()
+    all_machines = machine_counts.index.tolist()  # 検索用: 全機種
 
     if "mode3_machine" not in st.session_state:
         st.session_state["mode3_machine"] = valid_machines[0]
     if "form_selected_machine" not in st.session_state:
         st.session_state["form_selected_machine"] = valid_machines[0]
 
-    # 🔍 機種名検索
+    # 🔍 機種名検索（全機種を対象）
     search_q = st.text_input("🔍 機種名で検索", placeholder="例: カバネリ、北斗、モンキー", key="mode3_search")
     if search_q:
-        matched = [m for m in valid_machines if search_q in m]
+        matched = [m for m in all_machines if search_q in m]
         if matched:
             st.caption("検索結果（クリックで選択）")
             btn_cols = st.columns(min(len(matched), 4))
@@ -538,12 +539,16 @@ elif menu == "3. 機種別詳細分析":
         else:
             st.info("該当する機種が見つかりませんでした。")
 
+    # 選択された機種がvalid_machinesにない場合は先頭に追加
+    current_machine = st.session_state["mode3_machine"]
+    selectbox_options = valid_machines if current_machine in valid_machines else [current_machine] + valid_machines
+
     st.write("▼ 機種を選択し、更新ボタンを押してください")
     with st.form("machine_selection_form"):
-        default_idx = valid_machines.index(st.session_state["mode3_machine"]) if st.session_state["mode3_machine"] in valid_machines else 0
+        default_idx = selectbox_options.index(current_machine) if current_machine in selectbox_options else 0
         selected_machine = st.selectbox(
             "分析したい機種（データ数が多い順）",
-            valid_machines,
+            selectbox_options,
             index=default_idx
         )
         submitted = st.form_submit_button("🔄 データを更新する")
