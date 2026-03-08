@@ -203,10 +203,11 @@ if cross_menu != "選択しない":
         cross_new_file = "cross_new_machine_stats.csv"
         if os.path.exists(cross_new_file):
             cross_new_df = pd.read_csv(cross_new_file)
-            cross_new_df.columns = ['店名', '新台入替回数', '総導入台数', '平均差枚数', '平均回転数', '勝率']
+            cross_new_df.rename(columns={'店舗': '店名'}, inplace=True)
             cross_new_df['勝率'] = (cross_new_df['勝率'] * 100).round(1).astype(str) + "%"
             cross_new_df['平均差枚数'] = cross_new_df['平均差枚数'].round().astype(int)
-            cross_new_df['平均回転数'] = cross_new_df['平均回転数'].round().astype(int)
+            if '平均回転数' in cross_new_df.columns:
+                cross_new_df['平均回転数'] = cross_new_df['平均回転数'].round().astype(int)
             
             event = st.dataframe(
                 cross_new_df,
@@ -232,7 +233,7 @@ if cross_menu != "選択しない":
         cross_machine_file = "cross_machine_stats.csv"
         if os.path.exists(cross_machine_file):
             cross_m_df = pd.read_csv(cross_machine_file)
-            cross_m_df.columns = ['店名', '機種名', '総導入台数_旧', '稼働日数', '平均差枚数', '平均回転数', '勝率', '集計数']
+            cross_m_df.rename(columns={'店舗': '店名', '総導入台数': '総導入台数_旧'}, inplace=True)
 
             # 機種リストを集計数（全店合計）が多い順にソート
             machine_totals = cross_m_df.groupby('機種名')['集計数'].sum().sort_values(ascending=False)
@@ -322,9 +323,13 @@ if cross_menu != "選択しない":
                 d['勝率'] = pct.astype(str) + "%(" + plus_count.astype(str) + "/" + total_count.astype(str) + ")"
                 d.rename(columns={'集計数': '総導入台数'}, inplace=True)
                 d['平均差枚数'] = d['平均差枚数'].round().astype(int)
-                d['平均回転数'] = d['平均回転数'].round().astype(int)
                 d['稼働日数'] = d['稼働日数'].astype(int)
-                return d[[shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '平均回転数', '勝率']].rename(columns={shop_col: '店名'})
+                if '平均回転数' in d.columns:
+                    d['平均回転数'] = d['平均回転数'].round().astype(int)
+                    cols = [shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '平均回転数', '勝率']
+                else:
+                    cols = [shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '勝率']
+                return d[cols].rename(columns={shop_col: '店名'})
 
             display_df = None
             if filter_type == "全日程":
