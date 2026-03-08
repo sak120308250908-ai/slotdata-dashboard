@@ -24,7 +24,8 @@ for store, date in BAD_DATA_FILTER:
 
 # 異常データの除外（店舗+日付+台番）
 BAD_ROW_FILTER = [
-    ('メガコンコルド岡崎北', '2026-01-15', '800'),  # 差枚1664万枚の異常値
+    ('メガコンコルド岡崎北',        '2026-01-15', '800'),  # 差枚+1664万枚の異常値
+    ('キング観光サウザンド今池2号',  '2025-08-13', '815'),  # 差枚-418万枚の異常値
 ]
 for store, date, daiban in BAD_ROW_FILTER:
     mask = (df['店舗'] == store) & (df['日付'] == pd.Timestamp(date)) & (df['台番'].astype(str) == str(daiban))
