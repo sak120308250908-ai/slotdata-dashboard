@@ -40,6 +40,7 @@ machine_stats = df.groupby(['店舗', '機種名']).agg(
     総導入台数=('台番', 'nunique'),
     稼働日数=('日付', 'nunique'),
     平均差枚数=('差枚', 'mean'),
+    平均回転数=('G数', 'mean'),
     勝率=('Win', 'mean'),
     集計数=('差枚', 'count')
 ).reset_index()
@@ -85,12 +86,14 @@ def compute_store_new_stats(g):
     num_events = g['導入日'].nunique()   # 新台入替イベント数（導入日のユニーク数）
     total_units = len(g)                 # 新台初日の総台数
     avg_samaisu = g['差枚'].mean()
+    avg_g = g['G数'].mean()
     win_rate = g['Win'].mean()
     count = len(g)
     return pd.Series({
         '新台入替回数': num_events,
         '総導入台数': total_units,
         '平均差枚数': avg_samaisu,
+        '平均回転数': avg_g,
         '勝率': win_rate,
         'Count': count
     })

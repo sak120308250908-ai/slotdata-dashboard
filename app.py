@@ -98,7 +98,7 @@ def fetch_machine_cross_data(machine_name):
     while True:
         try:
             response = (supabase.table('slot_data')
-                       .select('店舗,日付,差枚')
+                       .select('店舗,日付,差枚,G数')
                        .eq('機種名', machine_name)
                        .range(offset, offset + limit - 1)
                        .execute())
@@ -112,10 +112,11 @@ def fetch_machine_cross_data(machine_name):
             break
         offset += limit
     if not all_data:
-        return pd.DataFrame(columns=['店舗', '日付', '差枚', 'Win'])
+        return pd.DataFrame(columns=['店舗', '日付', '差枚', 'G数', 'Win'])
     mdf = pd.DataFrame(all_data)
     mdf['日付'] = pd.to_datetime(mdf['日付'])
     mdf['差枚'] = pd.to_numeric(mdf['差枚'], errors='coerce')
+    mdf['G数'] = pd.to_numeric(mdf['G数'], errors='coerce').fillna(0)
     mdf['Win'] = (mdf['差枚'] > 0).astype(int)
     return mdf
 
@@ -202,9 +203,10 @@ if cross_menu != "選択しない":
         cross_new_file = "cross_new_machine_stats.csv"
         if os.path.exists(cross_new_file):
             cross_new_df = pd.read_csv(cross_new_file)
-            cross_new_df.columns = ['店名', '新台入替回数', '総導入台数', '平均差枚数', '勝率']
+            cross_new_df.columns = ['店名', '新台入替回数', '総導入台数', '平均差枚数', '平均回転数', '勝率']
             cross_new_df['勝率'] = (cross_new_df['勝率'] * 100).round(1).astype(str) + "%"
             cross_new_df['平均差枚数'] = cross_new_df['平均差枚数'].round().astype(int)
+            cross_new_df['平均回転数'] = cross_new_df['平均回転数'].round().astype(int)
             
             event = st.dataframe(
                 cross_new_df,
@@ -230,7 +232,7 @@ if cross_menu != "選択しない":
         cross_machine_file = "cross_machine_stats.csv"
         if os.path.exists(cross_machine_file):
             cross_m_df = pd.read_csv(cross_machine_file)
-            cross_m_df.columns = ['店名', '機種名', '総導入台数_旧', '稼働日数', '平均差枚数', '勝率', '集計数']
+            cross_m_df.columns = ['店名', '機種名', '総導入台数_旧', '稼働日数', '平均差枚数', '平均回転数', '勝率', '集計数']
 
             # 機種リストを集計数（全店合計）が多い順にソート
             machine_totals = cross_m_df.groupby('機種名')['集計数'].sum().sort_values(ascending=False)
@@ -320,8 +322,9 @@ if cross_menu != "選択しない":
                 d['勝率'] = pct.astype(str) + "%(" + plus_count.astype(str) + "/" + total_count.astype(str) + ")"
                 d.rename(columns={'集計数': '総導入台数'}, inplace=True)
                 d['平均差枚数'] = d['平均差枚数'].round().astype(int)
+                d['平均回転数'] = d['平均回転数'].round().astype(int)
                 d['稼働日数'] = d['稼働日数'].astype(int)
-                return d[[shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '勝率']].rename(columns={shop_col: '店名'})
+                return d[[shop_col, '稼働日数', '総導入台数', '1日あたりの稼働台数', '平均差枚数', '平均回転数', '勝率']].rename(columns={shop_col: '店名'})
 
             display_df = None
             if filter_type == "全日程":
@@ -352,6 +355,7 @@ if cross_menu != "選択しない":
                             稼働日数=('日付', 'nunique'),
                             集計数=('差枚', 'count'),
                             平均差枚数=('差枚', 'mean'),
+                            平均回転数=('G数', 'mean'),
                             勝率=('Win', 'mean')
                         ).reset_index()
                         stats = stats[stats['集計数'] >= 3]
@@ -459,13 +463,15 @@ if menu == "1. 全体サマリー＆特定日分析":
     min_count = int(min_count_str.replace("以上", ""))
 
     machine_stats = target_df.groupby('機種名').agg(
-        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
+        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
+        Avg_G=('G数', 'mean')
     ).reset_index()
 
     filtered_stats = machine_stats[machine_stats['Count'] >= min_count].sort_values('Avg_Samaisu', ascending=False).head(15)
     filtered_stats['Win_Rate'] = (filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
     filtered_stats['Avg_Samaisu'] = filtered_stats['Avg_Samaisu'].round().astype(int)
-    filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
+    filtered_stats['Avg_G'] = filtered_stats['Avg_G'].round().astype(int)
+    filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率', '平均回転数']
 
     st.write(f"{rank_label} の優良機種トップ15 (サンプル数{min_count}以上)")
     st.dataframe(filtered_stats, use_container_width=True, hide_index=True)
@@ -500,13 +506,15 @@ elif menu == "2. カレンダー・曜日分析":
     
     w_df = df[df['Weekday'] == target_weekday]
     w_machine_stats = w_df.groupby('機種名').agg(
-        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
+        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
+        Avg_G=('G数', 'mean')
     ).reset_index()
-    
+
     w_filtered_stats = w_machine_stats[w_machine_stats['Count'] >= min_count_w].sort_values('Avg_Samaisu', ascending=False).head(15)
     w_filtered_stats['Win_Rate'] = (w_filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
     w_filtered_stats['Avg_Samaisu'] = w_filtered_stats['Avg_Samaisu'].round().astype(int)
-    w_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
+    w_filtered_stats['Avg_G'] = w_filtered_stats['Avg_G'].round().astype(int)
+    w_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率', '平均回転数']
     
     st.write(f"**{target_weekday}** の優良機種トップ15 (サンプル数{min_count_w}以上)")
     st.dataframe(w_filtered_stats, use_container_width=True, hide_index=True)
@@ -579,6 +587,10 @@ elif menu == "3. 機種別詳細分析":
         fig_e = px.bar(e_stats, x='End_Digit', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
         fig_e.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig_e, use_container_width=True)
+        e_table = e_stats.copy()
+        e_table.columns = ['日付', '平均差枚']
+        e_table['平均差枚'] = e_table['平均差枚'].round().astype(int)
+        st.dataframe(e_table, use_container_width=True, hide_index=True)
 
     with col2:
         st.write("▼ 曜日別の平均差枚")
@@ -586,6 +598,10 @@ elif menu == "3. 機種別詳細分析":
         fig_w = px.bar(w_stats, x='Weekday', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
         fig_w.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
         st.plotly_chart(fig_w, use_container_width=True)
+        w_table = w_stats.copy()
+        w_table.columns = ['曜日', '平均差枚']
+        w_table['平均差枚'] = w_table['平均差枚'].round().astype(int)
+        st.dataframe(w_table, use_container_width=True, hide_index=True)
         
     with col3:
         st.write("▼ 差枚数の分布（ヒストグラム）")
@@ -1039,13 +1055,15 @@ elif menu == "4. 強力なクロス分析 (曜日×特定日)":
         min_count_c = st.number_input("最低サンプル数", min_value=1, value=5, key="min_count_cross")
         
         c_machine_stats = cross_df.groupby('機種名').agg(
-            Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean')
+            Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
+            Avg_G=('G数', 'mean')
         ).reset_index()
-        
+
         c_filtered_stats = c_machine_stats[c_machine_stats['Count'] >= min_count_c].sort_values('Avg_Samaisu', ascending=False).head(20)
         c_filtered_stats['Win_Rate'] = (c_filtered_stats['Win_Rate'] * 100).round(1).astype(str) + "%"
         c_filtered_stats['Avg_Samaisu'] = c_filtered_stats['Avg_Samaisu'].round().astype(int)
-        c_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率']
+        c_filtered_stats['Avg_G'] = c_filtered_stats['Avg_G'].round().astype(int)
+        c_filtered_stats.columns = ['機種名', 'サンプル数', '平均差枚数', '勝率', '平均回転数']
         st.dataframe(c_filtered_stats, use_container_width=True, hide_index=True)
 
 
