@@ -359,6 +359,8 @@ if cross_menu != "選択しない":
                         display_df = build_machine_display_df(stats, '店舗')
 
             if display_df is not None:
+                _date_label = "全日程" if filter_type == "全日程" else filter_label
+                st.markdown(f"**機種:** {selected_machine}　　**日程:** {_date_label}")
                 event = st.dataframe(
                     display_df,
                     use_container_width=True,
@@ -513,25 +515,43 @@ elif menu == "2. カレンダー・曜日分析":
 # --- 3. 機種別詳細分析 ---
 elif menu == "3. 機種別詳細分析":
     st.header("🎰 3. 機種別の詳細・グラフ")
-    
+
     # 選択できる機種名（全体で100件以上のデータがあるものに絞る）
     machine_counts = df['機種名'].value_counts()
     valid_machines = machine_counts[machine_counts >= 100].index.tolist()
-    
-    st.write("▼ 機種を選択し、更新ボタンを押してください")
-    with st.form("machine_selection_form"):
-        selected_machine = st.selectbox(
-            "分析したい機種（データ数が多い順）", 
-            valid_machines
-        )
-        submitted = st.form_submit_button("🔄 データを更新する")
-        
+
+    if "mode3_machine" not in st.session_state:
+        st.session_state["mode3_machine"] = valid_machines[0]
     if "form_selected_machine" not in st.session_state:
         st.session_state["form_selected_machine"] = valid_machines[0]
-        
+
+    # 🔍 機種名検索
+    search_q = st.text_input("🔍 機種名で検索", placeholder="例: カバネリ、北斗、モンキー", key="mode3_search")
+    if search_q:
+        matched = [m for m in valid_machines if search_q in m]
+        if matched:
+            st.caption("検索結果（クリックで選択）")
+            btn_cols = st.columns(min(len(matched), 4))
+            for i, m in enumerate(matched[:8]):
+                if btn_cols[i % 4].button(m, key=f"mode3_btn_{i}"):
+                    st.session_state["mode3_machine"] = m
+        else:
+            st.info("該当する機種が見つかりませんでした。")
+
+    st.write("▼ 機種を選択し、更新ボタンを押してください")
+    with st.form("machine_selection_form"):
+        default_idx = valid_machines.index(st.session_state["mode3_machine"]) if st.session_state["mode3_machine"] in valid_machines else 0
+        selected_machine = st.selectbox(
+            "分析したい機種（データ数が多い順）",
+            valid_machines,
+            index=default_idx
+        )
+        submitted = st.form_submit_button("🔄 データを更新する")
+
     if submitted:
         st.session_state["form_selected_machine"] = selected_machine
-        
+        st.session_state["mode3_machine"] = selected_machine
+
     display_machine = st.session_state["form_selected_machine"]
     m_df = df[df['機種名'] == display_machine]
     
