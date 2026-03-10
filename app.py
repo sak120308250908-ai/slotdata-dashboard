@@ -89,6 +89,21 @@ def fetch_store_data(store_name):
 
     return df
 
+@st.cache_data(show_spinner=False)
+def load_digit_stats():
+    f = "cross_machine_digit_stats.csv"
+    return pd.read_csv(f) if os.path.exists(f) else None
+
+@st.cache_data(show_spinner=False)
+def load_day_stats():
+    f = "cross_machine_day_stats.csv"
+    return pd.read_csv(f) if os.path.exists(f) else None
+
+@st.cache_data(show_spinner=False)
+def load_weekday_stats():
+    f = "cross_machine_weekday_stats.csv"
+    return pd.read_csv(f) if os.path.exists(f) else None
+
 @st.cache_data(ttl=3600, show_spinner="日程別データを全店舗から取得中...")
 def fetch_machine_cross_data(machine_name):
     """特定機種の全店舗データをSupabaseから取得（日程絞り込み用）"""
@@ -337,35 +352,47 @@ if cross_menu != "選択しない":
                 raw = raw.sort_values("平均差枚数", ascending=False)
                 raw.drop(columns=['機種名', '総導入台数_旧'], inplace=True)
                 display_df = build_machine_display_df(raw, '店名')
-            else:
-                machine_raw = fetch_machine_cross_data(selected_machine)
-                if len(machine_raw) == 0:
-                    st.warning("データが取得できませんでした。")
+            elif filter_type == "末尾の数字で絞り込む":
+                filter_label = digit_sel
+                digit_num = int(digit_sel[0])
+                d_df = load_digit_stats()
+                if d_df is None:
+                    st.warning("末尾別統計データが準備中です。generate_cross_stats.py を再実行してください。")
                 else:
-                    if filter_type == "末尾の数字で絞り込む":
-                        filtered = machine_raw[machine_raw['日付'].dt.day.astype(str).str.contains(digit_sel[0])].copy()
-                        filter_label = digit_sel
-                    elif filter_type == "特定の日付を指定する":
-                        day_num = int(day_sel.replace("日", ""))
-                        filtered = machine_raw[machine_raw['日付'].dt.day == day_num].copy()
-                        filter_label = day_sel
-                    else:  # 曜日を指定する
-                        _wmap = {'日曜日': 6, '月曜日': 0, '火曜日': 1, '水曜日': 2, '木曜日': 3, '金曜日': 4, '土曜日': 5}
-                        filtered = machine_raw[machine_raw['日付'].dt.weekday == _wmap[weekday_sel]].copy()
-                        filter_label = weekday_sel
-                    if len(filtered) == 0:
+                    raw = d_df[(d_df['機種名'] == selected_machine) & (d_df['End_Digit'] == digit_num)].copy()
+                    raw.drop(columns=['機種名', 'End_Digit'], inplace=True)
+                    raw = raw.sort_values("平均差枚数", ascending=False)
+                    if len(raw) == 0:
                         st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
                     else:
-                        stats = filtered.groupby('店舗').agg(
-                            稼働日数=('日付', 'nunique'),
-                            集計数=('差枚', 'count'),
-                            平均差枚数=('差枚', 'mean'),
-                            平均回転数=('G数', 'mean'),
-                            勝率=('Win', 'mean')
-                        ).reset_index()
-                        stats = stats[stats['集計数'] >= 3]
-                        stats = stats.sort_values("平均差枚数", ascending=False)
-                        display_df = build_machine_display_df(stats, '店舗')
+                        display_df = build_machine_display_df(raw, '店舗')
+            elif filter_type == "特定の日付を指定する":
+                day_num = int(day_sel.replace("日", ""))
+                filter_label = day_sel
+                d_df = load_day_stats()
+                if d_df is None:
+                    st.warning("日付別統計データが準備中です。generate_cross_stats.py を再実行してください。")
+                else:
+                    raw = d_df[(d_df['機種名'] == selected_machine) & (d_df['Day'] == day_num)].copy()
+                    raw.drop(columns=['機種名', 'Day'], inplace=True)
+                    raw = raw.sort_values("平均差枚数", ascending=False)
+                    if len(raw) == 0:
+                        st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
+                    else:
+                        display_df = build_machine_display_df(raw, '店舗')
+            else:  # 曜日を指定する
+                filter_label = weekday_sel
+                d_df = load_weekday_stats()
+                if d_df is None:
+                    st.warning("曜日別統計データが準備中です。generate_cross_stats.py を再実行してください。")
+                else:
+                    raw = d_df[(d_df['機種名'] == selected_machine) & (d_df['Weekday'] == weekday_sel)].copy()
+                    raw.drop(columns=['機種名', 'Weekday'], inplace=True)
+                    raw = raw.sort_values("平均差枚数", ascending=False)
+                    if len(raw) == 0:
+                        st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
+                    else:
+                        display_df = build_machine_display_df(raw, '店舗')
 
             if display_df is not None:
                 _date_label = "全日程" if filter_type == "全日程" else filter_label
@@ -461,7 +488,7 @@ if menu == "1. 全体サマリー＆特定日分析":
         end_digit_opts = ["0のつく日", "1のつく日", "2のつく日", "3のつく日", "4のつく日",
                           "5のつく日", "6のつく日", "7のつく日", "8のつく日", "9のつく日"]
         sel_digit = st.radio("末尾の数字を選択", end_digit_opts, horizontal=True, key="end_digit_rank_radio")
-        target_df = df[df['Day'].astype(str).str.contains(sel_digit[0])]
+        target_df = df[df['Day'] % 10 == int(sel_digit[0])]
         rank_label = f"**{sel_digit}**"
 
     min_count_str = st.radio("最低サンプル数", ["5以上", "10以上", "20以上"], horizontal=True, key="min_count_day_radio")

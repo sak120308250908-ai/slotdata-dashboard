@@ -50,6 +50,46 @@ machine_stats = machine_stats.sort_values(['機種名', '平均差枚数'], asce
 # 集計数は勝率X/Y表示のためCSVに残す
 machine_stats.to_csv("/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cross_machine_stats.csv", index=False)
 
+# 1b. 末尾別統計 (Cross Machine Digit Stats)
+print("Computing cross_machine_digit_stats...")
+df['End_Digit'] = df['日付'].dt.day % 10
+digit_stats = df.groupby(['店舗', '機種名', 'End_Digit']).agg(
+    稼働日数=('日付', 'nunique'),
+    集計数=('差枚', 'count'),
+    平均差枚数=('差枚', 'mean'),
+    平均回転数=('G数', 'mean'),
+    勝率=('Win', 'mean')
+).reset_index()
+digit_stats = digit_stats[digit_stats['集計数'] >= 3]
+digit_stats.to_csv("/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cross_machine_digit_stats.csv", index=False)
+
+# 1c. 日付別統計 (Cross Machine Day Stats)
+print("Computing cross_machine_day_stats...")
+df['Day'] = df['日付'].dt.day
+day_stats = df.groupby(['店舗', '機種名', 'Day']).agg(
+    稼働日数=('日付', 'nunique'),
+    集計数=('差枚', 'count'),
+    平均差枚数=('差枚', 'mean'),
+    平均回転数=('G数', 'mean'),
+    勝率=('Win', 'mean')
+).reset_index()
+day_stats = day_stats[day_stats['集計数'] >= 3]
+day_stats.to_csv("/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cross_machine_day_stats.csv", index=False)
+
+# 1d. 曜日別統計 (Cross Machine Weekday Stats)
+print("Computing cross_machine_weekday_stats...")
+_wday_map = {0: '月曜日', 1: '火曜日', 2: '水曜日', 3: '木曜日', 4: '金曜日', 5: '土曜日', 6: '日曜日'}
+df['Weekday'] = df['日付'].dt.weekday.map(_wday_map)
+weekday_stats = df.groupby(['店舗', '機種名', 'Weekday']).agg(
+    稼働日数=('日付', 'nunique'),
+    集計数=('差枚', 'count'),
+    平均差枚数=('差枚', 'mean'),
+    平均回転数=('G数', 'mean'),
+    勝率=('Win', 'mean')
+).reset_index()
+weekday_stats = weekday_stats[weekday_stats['集計数'] >= 3]
+weekday_stats.to_csv("/Users/satoushunsuke/Desktop/antigravityseisaku/slotdata/cross_machine_weekday_stats.csv", index=False)
+
 
 # 2. 新台分析 (Cross New Machine Stats)
 # ---- 新台の定義（app.py mode 5 と統一）----
