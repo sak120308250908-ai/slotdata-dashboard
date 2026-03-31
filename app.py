@@ -599,9 +599,34 @@ elif menu == "3. 機種別詳細分析":
 
     display_machine = st.session_state["form_selected_machine"]
     m_df = df[df['機種名'] == display_machine]
-    
+
+    # 🗓️ 日程絞り込み
+    st.markdown("---")
+    st.write("▼ 日程を絞り込む（任意）")
+    use_date_filter = st.checkbox("特定の日付で絞り込む", key="mode3_use_date_filter")
+    if use_date_filter:
+        date_col1, date_col2 = st.columns([2, 3])
+        with date_col1:
+            filter_date = st.date_input(
+                "日付を選択",
+                value=m_df['日付'].max().date() if len(m_df) > 0 else None,
+                min_value=m_df['日付'].min().date() if len(m_df) > 0 else None,
+                max_value=m_df['日付'].max().date() if len(m_df) > 0 else None,
+                key="mode3_filter_date"
+            )
+        filtered = m_df[m_df['日付'].dt.date == filter_date]
+        with date_col2:
+            if len(filtered) > 0:
+                st.success(f"{filter_date.strftime('%Y/%m/%d')} のデータ: {len(filtered):,}件")
+            else:
+                st.warning(f"{filter_date.strftime('%Y/%m/%d')} のデータはありません。")
+        m_df = filtered
+
     st.markdown("---")
     st.subheader(f"「{display_machine}」の基本データ")
+    if len(m_df) == 0:
+        st.info("選択した条件に該当するデータがありません。")
+        st.stop()
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("総稼働数", f"{len(m_df):,}回")
     c2.metric("平均差枚数", f"{m_df['差枚'].mean():.1f}枚")
@@ -609,36 +634,44 @@ elif menu == "3. 機種別詳細分析":
     c4.metric("最高差枚", f"{m_df['差枚'].max():,}枚")
     
     st.markdown("---")
-    st.subheader("📊 特定日・曜日・差枚数の傾向")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.write("▼ 特定日の傾向（末尾別の平均差枚）")
-        e_stats = m_df.groupby('End_Digit')['差枚'].mean().reset_index()
-        e_stats['End_Digit'] = e_stats['End_Digit'].astype(str) + "の付く日"
-        fig_e = px.bar(e_stats, x='End_Digit', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
-        fig_e.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
-        st.plotly_chart(fig_e, use_container_width=True)
-        e_table = e_stats.copy()
-        e_table.columns = ['日付', '平均差枚']
-        e_table['平均差枚'] = e_table['平均差枚'].round().astype(int)
-        st.dataframe(e_table, use_container_width=True, hide_index=True)
+    if use_date_filter:
+        # 特定日絞り込み時: 台番別データテーブルを表示
+        st.subheader(f"📋 {filter_date.strftime('%Y/%m/%d')} の台番別データ")
+        detail_cols = [c for c in ['台番', 'G数', 'BB', 'RB', 'ART', '差枚'] if c in m_df.columns]
+        detail_df = m_df[detail_cols].sort_values('差枚', ascending=False).copy()
+        detail_df['差枚'] = detail_df['差枚'].apply(lambda x: f"+{int(x):,}" if x > 0 else f"{int(x):,}")
+        st.dataframe(detail_df, use_container_width=True, hide_index=True)
+    else:
+        st.subheader("📊 特定日・曜日・差枚数の傾向")
+        col1, col2, col3 = st.columns(3)
 
-    with col2:
-        st.write("▼ 曜日別の平均差枚")
-        w_stats = m_df.groupby('Weekday')['差枚'].mean().reset_index()
-        fig_w = px.bar(w_stats, x='Weekday', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
-        fig_w.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
-        st.plotly_chart(fig_w, use_container_width=True)
-        w_table = w_stats.copy()
-        w_table.columns = ['曜日', '平均差枚']
-        w_table['平均差枚'] = w_table['平均差枚'].round().astype(int)
-        st.dataframe(w_table, use_container_width=True, hide_index=True)
-        
-    with col3:
-        st.write("▼ 差枚数の分布（ヒストグラム）")
-        fig_hist = px.histogram(m_df, x='差枚', nbins=50)
-        st.plotly_chart(fig_hist, use_container_width=True)
+        with col1:
+            st.write("▼ 特定日の傾向（末尾別の平均差枚）")
+            e_stats = m_df.groupby('End_Digit')['差枚'].mean().reset_index()
+            e_stats['End_Digit'] = e_stats['End_Digit'].astype(str) + "の付く日"
+            fig_e = px.bar(e_stats, x='End_Digit', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
+            fig_e.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
+            st.plotly_chart(fig_e, use_container_width=True)
+            e_table = e_stats.copy()
+            e_table.columns = ['日付', '平均差枚']
+            e_table['平均差枚'] = e_table['平均差枚'].round().astype(int)
+            st.dataframe(e_table, use_container_width=True, hide_index=True)
+
+        with col2:
+            st.write("▼ 曜日別の平均差枚")
+            w_stats = m_df.groupby('Weekday')['差枚'].mean().reset_index()
+            fig_w = px.bar(w_stats, x='Weekday', y='差枚', color='差枚', color_continuous_scale='RdYlGn')
+            fig_w.update_traces(hovertemplate="%{x}<br>平均差枚数: %{y:.0f}枚<extra></extra>")
+            st.plotly_chart(fig_w, use_container_width=True)
+            w_table = w_stats.copy()
+            w_table.columns = ['曜日', '平均差枚']
+            w_table['平均差枚'] = w_table['平均差枚'].round().astype(int)
+            st.dataframe(w_table, use_container_width=True, hide_index=True)
+
+        with col3:
+            st.write("▼ 差枚数の分布（ヒストグラム）")
+            fig_hist = px.histogram(m_df, x='差枚', nbins=50)
+            st.plotly_chart(fig_hist, use_container_width=True)
 
 # --- 5. 新台の初日・強弱分析 ---
 elif menu == "5. 新台の初日・強弱分析":
