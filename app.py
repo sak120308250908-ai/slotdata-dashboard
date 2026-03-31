@@ -305,7 +305,7 @@ if cross_menu != "選択しない":
             # ── 日程を絞り込む ──
             filter_type = st.radio(
                 "📅 日程を絞り込む",
-                ["全日程", "末尾の数字で絞り込む", "特定の日付を指定する", "曜日を指定する"],
+                ["全日程", "末尾の数字で絞り込む", "特定の日付を指定する", "曜日を指定する", "年月日を指定する"],
                 horizontal=True, key="cross_machine_filter_type", index=0
             )
 
@@ -326,6 +326,12 @@ if cross_menu != "選択しない":
                     "曜日を選択",
                     ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"],
                     horizontal=True, key="cross_machine_weekday_sel"
+                )
+            elif filter_type == "年月日を指定する":
+                exact_date_sel = st.date_input(
+                    "日付を選択",
+                    value=None,
+                    key="cross_machine_exact_date"
                 )
 
             # ── 共通ヘルパー: 表示用DataFrameを作成 ──
@@ -380,7 +386,7 @@ if cross_menu != "選択しない":
                         st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
                     else:
                         display_df = build_machine_display_df(raw, '店舗')
-            else:  # 曜日を指定する
+            elif filter_type == "曜日を指定する":
                 filter_label = weekday_sel
                 d_df = load_weekday_stats()
                 if d_df is None:
@@ -393,6 +399,28 @@ if cross_menu != "選択しない":
                         st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
                     else:
                         display_df = build_machine_display_df(raw, '店舗')
+            else:  # 年月日を指定する
+                if exact_date_sel is None:
+                    st.info("日付を選択してください。")
+                else:
+                    filter_label = exact_date_sel.strftime('%Y/%m/%d')
+                    with st.spinner(f"{filter_label} のデータを全店舗から取得中..."):
+                        cross_raw = fetch_machine_cross_data(selected_machine)
+                    if len(cross_raw) == 0:
+                        st.info("データが見つかりませんでした。")
+                    else:
+                        day_filtered = cross_raw[cross_raw['日付'].dt.date == exact_date_sel]
+                        if len(day_filtered) == 0:
+                            st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
+                        else:
+                            agg = day_filtered.groupby('店舗').agg(
+                                集計数=('差枚', 'count'),
+                                平均差枚数=('差枚', 'mean'),
+                                平均回転数=('G数', 'mean'),
+                                勝率=('Win', 'mean'),
+                            ).reset_index()
+                            agg['稼働日数'] = 1
+                            display_df = build_machine_display_df(agg, '店舗')
 
             if display_df is not None:
                 _date_label = "全日程" if filter_type == "全日程" else filter_label
