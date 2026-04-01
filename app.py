@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
+import unicodedata
 
 st.set_page_config(page_title="Slot Data Dashboard", page_icon="🎰", layout="wide")
 
@@ -257,7 +258,8 @@ if cross_menu != "選択しない":
             # ── 検索窓 ──
             search_q = st.text_input("🔍 機種名で検索", placeholder="例: 東京、北斗、ハナハナ", key="cross_machine_search")
             if search_q:
-                matched = [m for m in machine_list if search_q in m]
+                _sq = unicodedata.normalize('NFKC', search_q).replace(' ', '')
+                matched = [m for m in machine_list if _sq in unicodedata.normalize('NFKC', m).replace(' ', '')]
                 if matched:
                     st.caption("検索結果（クリックで選択）")
                     btn_cols = st.columns(min(len(matched), 4))
@@ -597,7 +599,8 @@ elif menu == "3. 機種別詳細分析":
     # 🔍 機種名検索（全機種を対象）
     search_q = st.text_input("🔍 機種名で検索", placeholder="例: カバネリ、北斗、モンキー", key="mode3_search")
     if search_q:
-        matched = [m for m in all_machines if search_q in m]
+        _sq = unicodedata.normalize('NFKC', search_q).replace(' ', '')
+        matched = [m for m in all_machines if _sq in unicodedata.normalize('NFKC', m).replace(' ', '')]
         if matched:
             st.caption("検索結果（クリックで選択）")
             btn_cols = st.columns(min(len(matched), 4))
