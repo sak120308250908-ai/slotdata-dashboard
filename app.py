@@ -84,6 +84,16 @@ def fetch_store_data(store_name):
     df['差枚'] = pd.to_numeric(df['差枚'], errors='coerce').fillna(0)
     df['G数'] = pd.to_numeric(df['G数'], errors='coerce').fillna(0)
     df['Win'] = (df['差枚'] > 0).astype(int)
+    # 台数: スロレポは実台数、Ppro（台番別）は1行=1台なので1
+    if '台数' in df.columns:
+        df['台数'] = pd.to_numeric(df['台数'], errors='coerce').fillna(1)
+    else:
+        df['台数'] = 1
+    # 勝ち台数: スロレポは実勝ち台数、Pproは1行=1台なのでWinと同じ
+    if '勝ち台数' in df.columns:
+        df['勝ち台数'] = pd.to_numeric(df['勝ち台数'], errors='coerce').fillna(df['Win'])
+    else:
+        df['勝ち台数'] = df['Win'].astype(float)
     
     # 機種名がNoneだとgroupby時にごっそり抜け落ちるため、「不明」で埋める
     df['機種名'] = df['機種名'].fillna('不明')
@@ -136,6 +146,43 @@ def fetch_machine_cross_data(machine_name):
     mdf['Win'] = (mdf['差枚'] > 0).astype(int)
     return mdf
 
+@st.cache_data(ttl=3600, show_spinner="データをSupabaseから取得中...")
+def fetch_machine_cross_data_by_date(machine_name, target_date_str):
+    """特定機種×特定日の全店舗データをSupabaseから取得"""
+    all_data = []
+    limit = 1000
+    offset = 0
+    while True:
+        try:
+            response = (supabase.table('slot_data')
+                       .select('店舗,日付,差枚,G数,台数,勝ち台数')
+                       .eq('機種名', machine_name)
+                       .eq('日付', target_date_str)
+                       .range(offset, offset + limit - 1)
+                       .execute())
+        except Exception:
+            break
+        data = response.data
+        if not data:
+            break
+        all_data.extend(data)
+        if len(data) < limit:
+            break
+        offset += limit
+    if not all_data:
+        return pd.DataFrame(columns=['店舗', '日付', '差枚', 'G数', 'Win'])
+    mdf = pd.DataFrame(all_data)
+    mdf['日付'] = pd.to_datetime(mdf['日付'])
+    mdf['差枚'] = pd.to_numeric(mdf['差枚'], errors='coerce').fillna(0)
+    mdf['G数'] = pd.to_numeric(mdf['G数'], errors='coerce').fillna(0)
+    mdf['台数'] = pd.to_numeric(mdf.get('台数', 1), errors='coerce').fillna(1)
+    mdf['Win'] = (mdf['差枚'] > 0).astype(int)
+    if '勝ち台数' in mdf.columns:
+        mdf['勝ち台数'] = pd.to_numeric(mdf['勝ち台数'], errors='coerce').fillna(mdf['Win'])
+    else:
+        mdf['勝ち台数'] = mdf['Win'].astype(float)
+    return mdf
+
 # --- サイドバー ---
 st.sidebar.title("🎰 解析メニュー")
 
@@ -171,7 +218,7 @@ def on_menu_change():
     st.session_state["force_cross_menu"] = "選択しない"
 
 # 固定の店舗リスト（データベースへの毎回のDistinctクエリ負荷を避けるためハードコード）
-shops = sorted(['プレイランドキャッスル知多にしの台', 'プレイランドキャッスル東郷', 'キング観光サウザンド生桑', 'JP888', 'キング観光尾鷲', 'メガコンコルド大口41号通り', 'プレイランドキャッスル高浜', 'A-FLAG津', 'KYORAKU妙音通', 'プレイランドキャッスル知多東海', 'メガコンコルド名古屋みなと23号通り', 'プレイランドキャッスル天白', 'タイキ豊橋藤沢', 'ラッキー1番日進竹の山', 'リブレ遊援館', 'プレイランドキャッスルワンダー', '玉越中川', 'キング観光サウザンド津', 'キャッスル大金', 'パーラーワールド小牧', 'ZENT岡崎インター', 'ZENT刈谷', 'キング観光サウザンド桑名本店', 'コスモジャパン三谷', 'キング観光サウザンド松阪', 'キング観光サウザンド栄若宮大通', 'メガコンコルド豊川インター', 'がちゃぽん南', 'KEIZ港', 'キクヤ長良', 'ZENT住吉', 'キング観光笠寺', 'キング観光サウザンド栄東新町', 'サンシャインKYORAKU平針', 'プレイランドキャッスル尾頭橋', 'プレイランドキャッスル記念橋南', 'タイキ四日市泊小柳', 'ラッキープラザ弥富', 'ラッキープラザ津島', 'キング観光サウザンド近鉄四日市', 'KYORAKU西', 'メガコンコルド春日井', 'ラッキープラザ可児', 'メガコンコルドみなと木場インター', 'オーギヤタウン半田', 'オーギヤ江南', 'メガコンコルドBLAZE', 'コスモジャパン大府', 'マルシン777', 'コンコルド愛西日比野駅前', 'ZENT扶桑', 'ZENT各務原', 'キャッスル岩倉', 'キング観光鈴鹿インター', 'プレイランドキャッスル上社', 'サンパレス', 'オーギヤ安城', 'キング観光名張', 'プレイランドキャッスル小牧', 'メガコンコルド刈谷知立', 'プレイランド第一平和', 'キング観光いなべ', 'キング観光サウザンド今池2号', 'コスモジャパン蒲郡', 'ZENT豊橋藤沢店', 'ZENT木曽川', 'メガガイア一宮', 'メガコンコルド稲沢', 'プレイランドキャッスル知多', 'プレイランドキャッスル大垣', 'キング666飛騨高山', 'M&K岡崎', 'MGM四日市', 'ゴー港', 'キクヤ島', 'グランドオータ鳴海', 'ZENT長久手', 'キング観光熊野', 'オータ岡崎', 'KEIZ中川運河', 'メガコンコルド岡崎インター', 'M&K道光寺', 'M&K本店', 'ラッキー1番江南', 'プレイランドキャッスル大曽根', 'ラッキープラザ関', 'A-FLAG瀬戸', 'キクヤ春日井', 'キング666一宮', 'ZENT稲沢', 'キング観光サウザンド桑名サンシパーク', 'メガコンコルド西尾', 'ZENT名古屋北', 'キング観光新瑞', 'キング666半田', 'プレイランドキャッスル春日井', 'プレイランドキャッスル熱田', 'コンコルド岐阜羽島駅前', 'グランワールドカップ本巣', '大丸桜山', 'ZENT市ノ坪', 'コスモジャパン西尾', 'パチンコ立岩', 'ラッキープラザ名古屋西インター七宝', 'ZENT可児', 'メガコンコルド岡崎北', 'キクヤ穂積', 'KYORAKU東海', 'ZENT梅坪', 'ZENT555', 'コンコルド一宮尾西インター', 'G&L一宮', 'ABC豊川', 'メガコンコルド大垣インター南', 'キング666東海', 'ミカド観光半田', 'キング観光サウザンド鈴鹿', 'メガコンコルド豊田インター', 'ZENT豊田本店', 'メガスロットコンコルド吉浜', 'キクヤ本店'])
+shops = sorted(['APANCLUB弘法通り', 'GOLD玉越浄水', 'プレイランドキャッスル知多にしの台', 'プレイランドキャッスル東郷', 'キング観光サウザンド生桑', 'JP888', 'キング観光尾鷲', 'メガコンコルド大口41号通り', 'プレイランドキャッスル高浜', 'A-FLAG津', 'KYORAKU妙音通', 'プレイランドキャッスル知多東海', 'メガコンコルド名古屋みなと23号通り', 'プレイランドキャッスル天白', 'タイキ豊橋藤沢', 'ラッキー1番日進竹の山', 'リブレ遊援館', 'プレイランドキャッスルワンダー', '玉越中川', 'キング観光サウザンド津', 'キャッスル大金', 'パーラーワールド小牧', 'ZENT岡崎インター', 'ZENT刈谷', 'キング観光サウザンド桑名本店', 'コスモジャパン三谷', 'キング観光サウザンド松阪', 'キング観光サウザンド栄若宮大通', 'メガコンコルド豊川インター', 'がちゃぽん南', 'KEIZ港', 'キクヤ長良', 'ZENT住吉', 'キング観光笠寺', 'キング観光サウザンド栄東新町', 'サンシャインKYORAKU平針', 'プレイランドキャッスル尾頭橋', 'プレイランドキャッスル記念橋南', 'タイキ四日市泊小柳', 'ラッキープラザ弥富', 'ラッキープラザ津島', 'キング観光サウザンド近鉄四日市', 'KYORAKU西', 'メガコンコルド春日井', 'ラッキープラザ可児', 'メガコンコルドみなと木場インター', 'オーギヤタウン半田', 'オーギヤ江南', 'メガコンコルドBLAZE', 'コスモジャパン大府', 'マルシン777', 'コンコルド愛西日比野駅前', 'ZENT扶桑', 'ZENT各務原', 'キャッスル岩倉', 'キング観光鈴鹿インター', 'プレイランドキャッスル上社', 'サンパレス', 'オーギヤ安城', 'キング観光名張', 'プレイランドキャッスル小牧', 'メガコンコルド刈谷知立', 'プレイランド第一平和', 'キング観光いなべ', 'キング観光サウザンド今池2号', 'コスモジャパン蒲郡', 'ZENT豊橋藤沢店', 'ZENT木曽川', 'メガガイア一宮', 'メガコンコルド稲沢', 'プレイランドキャッスル知多', 'プレイランドキャッスル大垣', 'キング666飛騨高山', 'M&K岡崎', 'MGM四日市', 'ゴー港', 'キクヤ島', 'グランドオータ鳴海', 'ZENT長久手', 'キング観光熊野', 'オータ岡崎', 'KEIZ中川運河', 'メガコンコルド岡崎インター', 'M&K道光寺', 'M&K本店', 'ラッキー1番江南', 'プレイランドキャッスル大曽根', 'ラッキープラザ関', 'A-FLAG瀬戸', 'キクヤ春日井', 'キング666一宮', 'ZENT稲沢', 'キング観光サウザンド桑名サンシパーク', 'メガコンコルド西尾', 'ZENT名古屋北', 'キング観光新瑞', 'キング666半田', 'プレイランドキャッスル春日井', 'プレイランドキャッスル熱田', 'コンコルド岐阜羽島駅前', 'グランワールドカップ本巣', '大丸桜山', 'ZENT市ノ坪', 'コスモジャパン西尾', 'パチンコ立岩', 'ラッキープラザ名古屋西インター七宝', 'ZENT可児', 'メガコンコルド岡崎北', 'キクヤ穂積', 'KYORAKU東海', 'ZENT梅坪', 'ZENT555', 'コンコルド一宮尾西インター', 'G&L一宮', 'ABC豊川', 'メガコンコルド大垣インター南', 'キング666東海', 'ミカド観光半田', 'キング観光サウザンド鈴鹿', 'メガコンコルド豊田インター', 'ZENT豊田本店', 'メガスロットコンコルド吉浜', 'キクヤ本店'])
 
 # 選択された店舗の管理 (クロス分析からのジャンプ対応)
 # selectboxのwidgetキー書き換えが不安定なため、nav_target_shopという独立したキーで
@@ -305,11 +352,13 @@ if cross_menu != "選択しない":
             )
 
             # ── 日程を絞り込む ──
+            _filter_options = ["全日程", "末尾の数字で絞り込む", "特定の日付を指定する", "曜日を指定する", "年月日を指定する"]
+            _saved_filter = st.session_state.get("_cross_filter_saved", "全日程")
+            _filter_idx = _filter_options.index(_saved_filter) if _saved_filter in _filter_options else 0
             filter_type = st.radio(
-                "📅 日程を絞り込む",
-                ["全日程", "末尾の数字で絞り込む", "特定の日付を指定する", "曜日を指定する", "年月日を指定する"],
-                horizontal=True, key="cross_machine_filter_type", index=0
+                "📅 日程を絞り込む", _filter_options, index=_filter_idx, horizontal=True
             )
+            st.session_state["_cross_filter_saved"] = filter_type
 
             if filter_type == "末尾の数字で絞り込む":
                 digit_sel = st.radio(
@@ -330,17 +379,18 @@ if cross_menu != "選択しない":
                     horizontal=True, key="cross_machine_weekday_sel"
                 )
             elif filter_type == "年月日を指定する":
-                exact_date_sel = st.date_input(
-                    "日付を選択",
-                    value=None,
-                    key="cross_machine_exact_date"
-                )
+                _prev_date = st.session_state.get("_cross_exact_date_saved", None)
+                exact_date_sel = st.date_input("日付を選択", value=_prev_date)
+                st.session_state["_cross_exact_date_saved"] = exact_date_sel
 
             # ── 共通ヘルパー: 表示用DataFrameを作成 ──
             def build_machine_display_df(df_in, shop_col):
                 d = df_in.copy()
                 d['1日あたりの稼働台数'] = (d['集計数'] / d['稼働日数']).round(1)
-                plus_count = (d['勝率'] * d['集計数']).round().astype(int)
+                if '勝ち台数合計' in d.columns:
+                    plus_count = d['勝ち台数合計'].round().astype(int)
+                else:
+                    plus_count = (d['勝率'] * d['集計数']).round().astype(int)
                 total_count = d['集計数'].astype(int)
                 pct = (d['勝率'] * 100).round(1)
                 d['勝率'] = pct.astype(str) + "%(" + plus_count.astype(str) + "/" + total_count.astype(str) + ")"
@@ -406,23 +456,32 @@ if cross_menu != "選択しない":
                     st.info("日付を選択してください。")
                 else:
                     filter_label = exact_date_sel.strftime('%Y/%m/%d')
+                    target_date_str = exact_date_sel.strftime('%Y-%m-%d')
                     with st.spinner(f"{filter_label} のデータを全店舗から取得中..."):
-                        cross_raw = fetch_machine_cross_data(selected_machine)
-                    if len(cross_raw) == 0:
-                        st.info("データが見つかりませんでした。")
+                        day_filtered = fetch_machine_cross_data_by_date(selected_machine, target_date_str)
+                    if len(day_filtered) == 0:
+                        st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
                     else:
-                        day_filtered = cross_raw[cross_raw['日付'].dt.date == exact_date_sel]
-                        if len(day_filtered) == 0:
-                            st.info(f"「{filter_label}」に該当するデータが見つかりませんでした。")
+                        if '台数' not in day_filtered.columns:
+                            day_filtered = day_filtered.copy()
+                            day_filtered['台数'] = 1
                         else:
-                            agg = day_filtered.groupby('店舗').agg(
-                                集計数=('差枚', 'count'),
-                                平均差枚数=('差枚', 'mean'),
-                                平均回転数=('G数', 'mean'),
-                                勝率=('Win', 'mean'),
-                            ).reset_index()
-                            agg['稼働日数'] = 1
-                            display_df = build_machine_display_df(agg, '店舗')
+                            day_filtered = day_filtered.copy()
+                            day_filtered['台数'] = pd.to_numeric(day_filtered['台数'], errors='coerce').fillna(1)
+                        if '勝ち台数' not in day_filtered.columns:
+                            day_filtered['勝ち台数'] = day_filtered['Win'].astype(float)
+                        else:
+                            day_filtered['勝ち台数'] = pd.to_numeric(day_filtered['勝ち台数'], errors='coerce').fillna(day_filtered['Win'])
+
+                        agg = day_filtered.groupby('店舗').agg(
+                            集計数=('台数', 'sum'),
+                            勝ち台数合計=('勝ち台数', 'sum'),
+                            平均差枚数=('差枚', 'mean'),
+                            平均回転数=('G数', 'mean'),
+                        ).reset_index()
+                        agg['稼働日数'] = 1
+                        agg['勝率'] = agg['勝ち台数合計'] / agg['集計数']
+                        display_df = build_machine_display_df(agg, '店舗')
 
             if display_df is not None:
                 _date_label = "全日程" if filter_type == "全日程" else filter_label
@@ -521,11 +580,11 @@ if menu == "1. 全体サマリー＆特定日分析":
         target_df = df[df['Day'] % 10 == int(sel_digit[0])]
         rank_label = f"**{sel_digit}**"
 
-    min_count_str = st.radio("最低サンプル数", ["5以上", "10以上", "20以上"], horizontal=True, key="min_count_day_radio")
+    min_count_str = st.radio("最低サンプル数（台数）", ["5以上", "10以上", "20以上", "30以上", "40以上", "50以上", "100以上", "200以上"], horizontal=True, key="min_count_day_radio")
     min_count = int(min_count_str.replace("以上", ""))
 
     machine_stats = target_df.groupby('機種名').agg(
-        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
+        Count=('台数', 'sum'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
         Avg_G=('G数', 'mean')
     ).reset_index()
 
@@ -563,12 +622,12 @@ elif menu == "2. カレンダー・曜日分析":
     st.markdown("---")
     st.subheader("🔍 曜日別の「強い機種」ランキング")
     target_weekday = st.selectbox("分析したい曜日を選択", ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'], index=5)
-    min_count_w_str = st.radio("最低サンプル数の絞り込み", ["5以上", "10以上", "20以上"], horizontal=True, key="min_count_weekday_radio")
+    min_count_w_str = st.radio("最低サンプル数の絞り込み（台数）", ["5以上", "10以上", "20以上", "30以上", "40以上", "50以上", "100以上", "200以上"], horizontal=True, key="min_count_weekday_radio")
     min_count_w = int(min_count_w_str.replace("以上", ""))
     
     w_df = df[df['Weekday'] == target_weekday]
     w_machine_stats = w_df.groupby('機種名').agg(
-        Count=('差枚', 'count'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
+        Count=('台数', 'sum'), Avg_Samaisu=('差枚', 'mean'), Win_Rate=('Win', 'mean'),
         Avg_G=('G数', 'mean')
     ).reset_index()
 
@@ -586,9 +645,11 @@ elif menu == "2. カレンダー・曜日分析":
 elif menu == "3. 機種別詳細分析":
     st.header("🎰 3. 機種別の詳細・グラフ")
 
-    # 選択できる機種名（全体で100件以上のデータがあるものに絞る）
+    # 選択できる機種名（全体で100件以上のデータがあるものに絞る、なければ全機種）
     machine_counts = df['機種名'].value_counts()
     valid_machines = machine_counts[machine_counts >= 100].index.tolist()
+    if not valid_machines:
+        valid_machines = machine_counts.index.tolist()
     all_machines = machine_counts.index.tolist()  # 検索用: 全機種
 
     if "mode3_machine" not in st.session_state:
@@ -664,14 +725,25 @@ elif menu == "3. 機種別詳細分析":
     c3.metric("勝率", f"{m_df['Win'].mean() * 100:.1f}%")
     c4.metric("最高差枚", f"{m_df['差枚'].max():,}枚")
     
+    is_slorepo = '台番' in df.columns and (df['台番'] == 'スロレポ').all()
+
     st.markdown("---")
     if use_date_filter:
-        # 特定日絞り込み時: 台番別データテーブルを表示
-        st.subheader(f"📋 {filter_date.strftime('%Y/%m/%d')} の台番別データ")
-        detail_cols = [c for c in ['台番', 'G数', 'BB', 'RB', 'ART', '差枚'] if c in m_df.columns]
-        detail_df = m_df[detail_cols].sort_values('差枚', ascending=False).copy()
-        detail_df['差枚'] = detail_df['差枚'].apply(lambda x: f"+{int(x):,}" if x > 0 else f"{int(x):,}")
-        st.dataframe(detail_df, use_container_width=True, hide_index=True)
+        if is_slorepo:
+            # スロレポデータ: 台番別ではなく機種集計データを表示
+            st.subheader(f"📋 {filter_date.strftime('%Y/%m/%d')} の機種別データ（スロレポ）")
+            detail_cols = [c for c in ['機種名', '台数', '差枚', 'G数'] if c in m_df.columns]
+            detail_df = m_df[detail_cols].sort_values('差枚', ascending=False).copy()
+            detail_df = detail_df.rename(columns={'差枚': '平均差枚', 'G数': '平均G数'})
+            detail_df['平均差枚'] = detail_df['平均差枚'].apply(lambda x: f"+{int(x):,}" if x > 0 else f"{int(x):,}")
+            st.dataframe(detail_df, use_container_width=True, hide_index=True)
+        else:
+            # 特定日絞り込み時: 台番別データテーブルを表示
+            st.subheader(f"📋 {filter_date.strftime('%Y/%m/%d')} の台番別データ")
+            detail_cols = [c for c in ['台番', 'G数', 'BB', 'RB', 'ART', '差枚'] if c in m_df.columns]
+            detail_df = m_df[detail_cols].sort_values('差枚', ascending=False).copy()
+            detail_df['差枚'] = detail_df['差枚'].apply(lambda x: f"+{int(x):,}" if x > 0 else f"{int(x):,}")
+            st.dataframe(detail_df, use_container_width=True, hide_index=True)
     else:
         st.subheader("📊 特定日・曜日・差枚数の傾向")
         col1, col2, col3 = st.columns(3)
