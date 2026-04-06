@@ -1030,12 +1030,21 @@ elif menu == "5. 新台の初日・強弱分析":
                 display_cols = ['機種名', '台数', '平均差枚数', '平均回転数', '平均BB', '平均RB', '平均ART', '勝率']
                 
                 # Pandas Stylerのフォーマット設定（全表で共通使用）
+                # BB/RB/ARTは '-' 文字列を含む場合があるため安全なfmt関数を使用
+                def _fmt_bb_cell(v):
+                    try:
+                        if v == '-' or v is None:
+                            return '-'
+                        return f'{float(v):.1f}'
+                    except Exception:
+                        return str(v)
+
                 style_formats = {
                     '平均差枚数': format_diff,
                     '平均回転数': '{:,.0f}',
-                    '平均BB': '{:.1f}',
-                    '平均RB': '{:.1f}',
-                    '平均ART': '{:.1f}'
+                    '平均BB': _fmt_bb_cell,
+                    '平均RB': _fmt_bb_cell,
+                    '平均ART': _fmt_bb_cell
                 }
                 
                 for date in unique_dates:
