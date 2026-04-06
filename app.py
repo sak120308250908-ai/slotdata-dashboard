@@ -37,6 +37,13 @@ def init_connection():
 
 supabase = init_connection()
 
+def normalize_machine_name(value):
+    if pd.isna(value):
+        return '不明'
+    normalized = unicodedata.normalize('NFKC', str(value)).replace('　', ' ')
+    normalized = ' '.join(normalized.split())
+    return normalized if normalized else '不明'
+
 @st.cache_data(ttl=3600, show_spinner="データをSupabaseから取得中...")
 def fetch_store_data(store_name):
     all_data = []
@@ -95,8 +102,8 @@ def fetch_store_data(store_name):
     else:
         df['勝ち台数'] = df['Win'].astype(float)
     
-    # 機種名がNoneだとgroupby時にごっそり抜け落ちるため、「不明」で埋める
-    df['機種名'] = df['機種名'].fillna('不明')
+    # 機種名の表記ゆらぎを最小限そろえる
+    df['機種名'] = df['機種名'].apply(normalize_machine_name)
 
     return df
 
@@ -185,6 +192,7 @@ def fetch_machine_cross_data_by_date(machine_name, target_date_str):
 
 # --- サイドバー ---
 st.sidebar.title("🎰 解析メニュー")
+st.sidebar.caption("ver.20260406-fix")
 
 st.sidebar.markdown("### 🌐 全店横断分析モード")
 
@@ -783,10 +791,24 @@ elif menu == "5. 新台の初日・強弱分析":
     
     if st.button("新台の初日データを抽出する"):
         with st.spinner("新台のデータを抽出中..."):
+            # スロレポ店舗かどうか判定（型変換して確実に比較）
+            is_slorepo_store = '台番' in df.columns and df['台番'].astype(str).str.contains('スロレポ', na=False).any()
+            st.caption(f"[debug] is_slorepo={is_slorepo_store} | 台番sample={df['台番'].astype(str).value_counts().head(3).to_dict() if '台番' in df.columns else 'no 台番'}")
+            import unicodedata as _ud
+
+            def _norm_machine(name):
+                """機種名の表記ゆらぎを正規化（チルダ・スペース統一）"""
+                n = _ud.normalize('NFKC', str(name))
+                n = n.replace('\u301c', '〜').replace('\uff5e', '〜')
+                return n.strip()
+
             min_date = df['日付'].min()
-            first_appearance = df.groupby('機種名')['日付'].min().reset_index()
+            buffer_days = pd.Timedelta(days=1)
+            df['_機種名_norm'] = df['機種名'].apply(_norm_machine)
+            first_appearance = df.groupby('_機種名_norm')['日付'].min().reset_index()
+            first_appearance.rename(columns={'_機種名_norm': '機種名'}, inplace=True)
             new_machines_df = first_appearance[
-                (first_appearance['日付'] > min_date) &
+                (first_appearance['日付'] > min_date + buffer_days) &
                 (first_appearance['機種名'] != '不明')  # 機種名不明は除外
             ]
             new_machines = new_machines_df['機種名'].tolist()
@@ -796,30 +818,53 @@ elif menu == "5. 新台の初日・強弱分析":
             else:
                 results = []
                 for machine in new_machines:
-                    m_df = df[df['機種名'] == machine].sort_values('日付')
+                    m_df = df[df['_機種名_norm'] == machine].sort_values('日付')
+                    display_name = m_df['機種名'].mode().iloc[0] if len(m_df) > 0 else machine
                     # G数が0より大きいレコード（実際に稼働した日）
                     active_m_df = m_df[m_df['G数'] > 0]
                     
                     if len(active_m_df) > 0:
                         first_active_date = active_m_df['日付'].iloc[0]
                         target_df = m_df[m_df['日付'] == first_active_date]
+
+                        # スロレポとPproで計算方法を分ける
+                        if is_slorepo_store and '台数' in target_df.columns and '勝ち台数' in target_df.columns:
+                            # スロレポ: 台数=勝率の分母, 勝ち台数=勝率の分子
+                            _台数_vals = pd.to_numeric(target_df['台数'], errors='coerce').fillna(0)
+                            _勝ち台数_vals = pd.to_numeric(target_df['勝ち台数'], errors='coerce').fillna(0)
+                            _total = _台数_vals.sum()
+                            台数_display = int(_total) if _total > 0 else 0
+                            avg_g = (pd.to_numeric(target_df['G数'], errors='coerce').fillna(0) * _台数_vals).sum() / _total if _total > 0 else 0
+                            avg_diff = (pd.to_numeric(target_df['差枚'], errors='coerce').fillna(0) * _台数_vals).sum() / _total if _total > 0 else 0
+                            win_rate = _勝ち台数_vals.sum() / _total * 100 if _total > 0 else 0
+                            avg_bb = avg_rb = avg_art = None  # スロレポはBB/RB/ARTなし
+                        else:
+                            台数_display = len(target_df)
+                            avg_g = target_df['G数'].mean()
+                            avg_diff = target_df['差枚'].mean()
+                            win_rate = (target_df['差枚'] > 0).mean() * 100
+                            avg_bb = target_df['BB'].mean() if 'BB' in target_df.columns and target_df['BB'].notna().any() else None
+                            avg_rb = target_df['RB'].mean() if 'RB' in target_df.columns and target_df['RB'].notna().any() else None
+                            avg_art = target_df['ART'].mean() if 'ART' in target_df.columns and target_df['ART'].notna().any() else None
                         
-                        avg_g = target_df['G数'].mean()
-                        avg_bb = target_df['BB'].mean() if 'BB' in target_df.columns else 0
-                        avg_rb = target_df['RB'].mean() if 'RB' in target_df.columns else 0
-                        avg_art = target_df['ART'].mean() if 'ART' in target_df.columns else 0
-                        avg_diff = target_df['差枚'].mean()
-                        win_rate = (target_df['差枚'] > 0).mean() * 100
-                        
+                        def _fmt_stat(v):
+                            """BB/RB/ARTの値をフォーマット（None/NaN → '-'）"""
+                            try:
+                                if v is None or pd.isna(v):
+                                    return '-'
+                                return round(float(v), 1)
+                            except Exception:
+                                return '-'
+
                         results.append({
-                            '機種名': machine,
+                            '機種名': display_name,
                             '導入/初稼働日': first_active_date.strftime('%Y-%m-%d'),
-                            '台数': len(target_df),
-                            '平均回転数': int(round(avg_g)),    # 小数点なし
-                            '平均BB': round(avg_bb, 1),
-                            '平均RB': round(avg_rb, 1),
-                            '平均ART': round(avg_art, 1),
-                            '平均差枚数': int(round(avg_diff)), # 小数点なし
+                            '台数': 台数_display,
+                            '平均回転数': int(round(avg_g)),
+                            '平均BB': _fmt_stat(avg_bb),
+                            '平均RB': _fmt_stat(avg_rb),
+                            '平均ART': _fmt_stat(avg_art),
+                            '平均差枚数': int(round(avg_diff)),
                             '勝率': f"{win_rate:.1f}%"
                         })
                 
@@ -862,7 +907,7 @@ elif menu == "5. 新台の初日・強弱分析":
                 # 今回は簡略化のため元データdfから直接新台の全件を再抽出して勝率を出す
                 all_new_active_records = []
                 for machine in new_machines:
-                    m_df = df[df['機種名'] == machine].sort_values('日付')
+                    m_df = df[df['_機種名_norm'] == machine].sort_values('日付')
                     active_m_df = m_df[m_df['G数'] > 0]
                     if len(active_m_df) > 0:
                         first_active_date = active_m_df['日付'].iloc[0]
@@ -870,7 +915,11 @@ elif menu == "5. 新台の初日・強弱分析":
                 
                 if all_new_active_records:
                     all_new_df = pd.concat(all_new_active_records)
-                    overall_win_rate = (all_new_df['差枚'] > 0).mean() * 100
+                    if is_slorepo_store and '台数' in all_new_df.columns:
+                        _t = all_new_df['台数'].sum()
+                        overall_win_rate = all_new_df['勝ち台数'].sum() / _t * 100 if _t > 0 else 0
+                    else:
+                        overall_win_rate = (all_new_df['差枚'] > 0).mean() * 100
                 else:
                     overall_win_rate = 0
                 
@@ -903,7 +952,12 @@ elif menu == "5. 新台の初日・強弱分析":
                     elif 10 <= count <= 19: return "10-19台機種"
                     else: return "20台以上機種"
                 
-                all_new_df['Tier'] = all_new_df.groupby('機種名')['台番'].transform('count').apply(get_tier)
+                # スロレポの場合は台数カラムを使ってTierを計算
+                if is_slorepo_store and '台数' in all_new_df.columns:
+                    all_new_df['_台数'] = all_new_df['台数']
+                else:
+                    all_new_df['_台数'] = 1  # Ppro: 1行=1台
+                all_new_df['Tier'] = all_new_df['_台数'].apply(get_tier)
                 
                 tier_order = ["1台機種", "2-4台機種", "5-9台機種", "10-19台機種", "20台以上機種"]
                 tier_results = []
@@ -911,11 +965,19 @@ elif menu == "5. 新台の初日・強弱分析":
                 for tier in tier_order:
                     t_df = all_new_df[all_new_df['Tier'] == tier]
                     if len(t_df) > 0:
-                        t_machines = len(t_df)
-                        t_avg_g = t_df['G数'].mean()
-                        t_total_diff = t_df['差枚'].sum()
-                        t_avg_diff = t_df['差枚'].mean()
-                        t_win_rate = (t_df['差枚'] > 0).mean() * 100
+                        if is_slorepo_store and '台数' in t_df.columns:
+                            t_total = t_df['台数'].sum()
+                            t_machines = int(t_total)
+                            t_avg_g = (t_df['G数'] * t_df['台数']).sum() / t_total if t_total > 0 else 0
+                            t_total_diff = (t_df['差枚'] * t_df['台数']).sum()
+                            t_avg_diff = t_total_diff / t_total if t_total > 0 else 0
+                            t_win_rate = t_df['勝ち台数'].sum() / t_total * 100 if t_total > 0 else 0
+                        else:
+                            t_machines = len(t_df)
+                            t_avg_g = t_df['G数'].mean()
+                            t_total_diff = t_df['差枚'].sum()
+                            t_avg_diff = t_df['差枚'].mean()
+                            t_win_rate = (t_df['差枚'] > 0).mean() * 100
                         
                         tier_results.append({
                             '導入規模': tier,
