@@ -803,7 +803,8 @@ elif menu == "5. 新台の初日・強弱分析":
                 return n.strip()
 
             min_date = df['日付'].min()
-            buffer_days = pd.Timedelta(days=1)
+            # スロレポ店舗は11/15〜11/19の不確実期間を除外するため4日バッファ
+            buffer_days = pd.Timedelta(days=4) if is_slorepo_store else pd.Timedelta(days=1)
             df['_機種名_norm'] = df['機種名'].apply(_norm_machine)
             first_appearance = df.groupby('_機種名_norm')['日付'].min().reset_index()
             first_appearance.rename(columns={'_機種名_norm': '機種名'}, inplace=True)

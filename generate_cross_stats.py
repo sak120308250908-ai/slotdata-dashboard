@@ -246,7 +246,10 @@ if slorepo_df_raw is not None and len(slorepo_df_raw) > 0:
     sr_store_min.rename(columns={'日付': '店舗最古日'}, inplace=True)
 
     sr_first = pd.merge(sr_first, sr_store_min, on='店舗')
-    sr_new_machines = sr_first[sr_first['初登場日'] > sr_first['店舗最古日']][['店舗', '機種名']]
+    # スロレポは11/15〜11/19の不確実期間を除外（4日バッファ）
+    sr_new_machines = sr_first[
+        sr_first['初登場日'] > sr_first['店舗最古日'] + pd.Timedelta(days=4)
+    ][['店舗', '機種名']]
 
     sr_active = sr[sr['平均G数'] > 0][['店舗', '機種名', '日付']]
     sr_new_active = pd.merge(sr_new_machines, sr_active, on=['店舗', '機種名'])
